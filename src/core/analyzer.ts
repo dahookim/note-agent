@@ -379,11 +379,13 @@ ${this.truncateContent(note.content, 2000)}
     notePath?: string
   ): Promise<void> {
     // 모델명에서 provider 추출
-    let provider: 'gemini' | 'claude' | 'openai' = 'gemini';
+    let provider: 'gemini' | 'claude' | 'openai' | 'xai' = 'gemini';
     if (result.model.includes('claude')) {
       provider = 'claude';
     } else if (result.model.includes('gpt') || result.model.includes('embedding')) {
       provider = 'openai';
+    } else if (result.model.includes('grok')) {
+      provider = 'xai';
     }
 
     await this.database.logUsage({

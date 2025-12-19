@@ -75,7 +75,7 @@ CREATE INDEX IF NOT EXISTS idx_gaps_priority ON knowledge_gaps(priority);
 CREATE TABLE IF NOT EXISTS usage_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-  provider TEXT NOT NULL CHECK(provider IN ('gemini', 'claude', 'openai')),
+  provider TEXT NOT NULL CHECK(provider IN ('gemini', 'claude', 'openai', 'xai')),
   model TEXT NOT NULL,
   operation TEXT NOT NULL CHECK(operation IN ('generation', 'embedding')),
   input_tokens INTEGER DEFAULT 0,

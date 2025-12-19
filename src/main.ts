@@ -1,16 +1,21 @@
 import { App, Plugin, PluginManifest, Notice, TFile, Events } from 'obsidian';
-import { OSBASettings, DEFAULT_SETTINGS, Job, JobStatus } from './types';
+import { OSBASettings, DEFAULT_SETTINGS, Job, JobStatus, AnalysisResult } from './types';
 import { OSBASettingTab } from './ui/settings';
 import { Database } from './db/database';
 import { AIProviderManager } from './api/provider';
 import { EmbeddingService } from './core/embeddings';
 import { ConnectionAnalyzer } from './core/analyzer';
+import { FrontmatterManager } from './core/frontmatter';
 import { QuickDraftModal } from './ui/modals';
 import {
   JobQueueView,
   JOB_QUEUE_VIEW_TYPE,
   CostDashboardView,
-  COST_DASHBOARD_VIEW_TYPE
+  COST_DASHBOARD_VIEW_TYPE,
+  SimilarNotesView,
+  SIMILAR_NOTES_VIEW_TYPE,
+  KnowledgeGraphView,
+  KNOWLEDGE_GRAPH_VIEW_TYPE
 } from './ui/views';
 
 /**
@@ -28,6 +33,7 @@ export default class OSBAPlugin extends Plugin {
   providerManager!: AIProviderManager;
   embeddingService!: EmbeddingService;
   connectionAnalyzer!: ConnectionAnalyzer;
+  frontmatterManager!: FrontmatterManager;
 
   // Event emitter for internal communication
   events: Events = new Events();
@@ -151,6 +157,9 @@ export default class OSBAPlugin extends Plugin {
         this.settings
       );
 
+      // Initialize frontmatter manager
+      this.frontmatterManager = new FrontmatterManager(this.app);
+
     } catch (error) {
       console.error('Failed to initialize OSBA services:', error);
       new Notice('OSBA: Failed to initialize. Check console for details.');
@@ -173,6 +182,18 @@ export default class OSBAPlugin extends Plugin {
     this.registerView(
       COST_DASHBOARD_VIEW_TYPE,
       (leaf) => new CostDashboardView(leaf, this)
+    );
+
+    // Similar Notes View
+    this.registerView(
+      SIMILAR_NOTES_VIEW_TYPE,
+      (leaf) => new SimilarNotesView(leaf, this)
+    );
+
+    // Knowledge Graph View
+    this.registerView(
+      KNOWLEDGE_GRAPH_VIEW_TYPE,
+      (leaf) => new KnowledgeGraphView(leaf, this)
     );
   }
 
@@ -372,10 +393,19 @@ export default class OSBAPlugin extends Plugin {
 
       this.updateJobProgress(job.id, 80);
 
-      // Log cost
+      // Log cost - determine provider from model result
+      let provider: 'gemini' | 'claude' | 'openai' | 'xai' = 'gemini';
+      if (result.model.includes('claude')) {
+        provider = 'claude';
+      } else if (result.model.includes('gpt')) {
+        provider = 'openai';
+      } else if (result.model.includes('grok')) {
+        provider = 'xai';
+      }
+
       await this.database.logUsage({
-        provider: 'gemini',
-        model: this.settings.quickDraftModel,
+        provider,
+        model: result.model,
         operation: 'generation',
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
@@ -535,14 +565,12 @@ Generate the markdown content for the note:`;
     return false;
   }
 
-  private async updateNoteFrontmatter(file: TFile, result: any): Promise<void> {
-    // Implementation will update YAML frontmatter with osba namespace
-    // This is a placeholder - full implementation in frontmatter.ts
+  private async updateNoteFrontmatter(file: TFile, result: AnalysisResult): Promise<void> {
+    await this.frontmatterManager.updateNoteFrontmatter(file, result);
   }
 
-  private async addInsightsSection(file: TFile, result: any): Promise<void> {
-    // Implementation will add/update ## 🧠 Connected Insights section
-    // This is a placeholder - full implementation in frontmatter.ts
+  private async addInsightsSection(file: TFile, result: AnalysisResult): Promise<void> {
+    await this.frontmatterManager.addInsightsSection(file, result);
   }
 
   // ============================================
