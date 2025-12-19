@@ -2,6 +2,24 @@
 
 All notable changes to OSBA (Obsidian Second Brain Agent) will be documented in this file.
 
+## [0.2.1] - 2025-12-20
+
+### Added
+- **Indexing Mode Selection**: Choose between exclude mode (exclude specific folders) or include mode (only index specific folders)
+  - 🚫 제외 모드: 지정한 폴더만 제외하고 나머지 모두 인덱싱
+  - ✅ 포함 모드: 지정한 폴더만 인덱싱
+- **Progress Modal**: Visual progress indicator for long-running operations
+  - Animated progress bar with status indicators
+  - Support for running, completed, error, and cancelled states
+- **Beginner-Friendly README**: Complete documentation rewrite with analogies
+  - Library/Librarian analogy for easy understanding
+  - Step-by-step setup guide
+  - FAQ and troubleshooting sections
+
+### Changed
+- Settings UI now dynamically shows exclude/include folder settings based on selected mode
+- Warning message when include mode has no folders specified
+
 ## [0.2.0] - 2025-01-24
 
 ### Added

@@ -549,17 +549,36 @@ Generate the markdown content for the note:`;
   // Helper Methods
   // ============================================
 
-  private isExcluded(file: TFile): boolean {
-    // Check excluded folders
-    for (const folder of this.settings.excludedFolders) {
-      if (file.path.startsWith(folder + '/')) {
-        return true;
-      }
-    }
-
-    // Check file size
+  public isExcluded(file: TFile): boolean {
+    // Check file size first (applies to both modes)
     if (file.stat.size > this.settings.maxNoteSize) {
       return true;
+    }
+
+    // Check indexing mode
+    if (this.settings.indexingMode === 'include') {
+      // Include mode: only index files in includedFolders
+      if (this.settings.includedFolders.length === 0) {
+        // No folders specified, include nothing (exclude all)
+        return true;
+      }
+
+      // Check if file is in any included folder
+      const isIncluded = this.settings.includedFolders.some(folder =>
+        file.path.startsWith(folder + '/') || file.path === folder
+      );
+
+      // If not in included folders, exclude it
+      if (!isIncluded) {
+        return true;
+      }
+    } else {
+      // Exclude mode (default): exclude files in excludedFolders
+      for (const folder of this.settings.excludedFolders) {
+        if (file.path.startsWith(folder + '/')) {
+          return true;
+        }
+      }
     }
 
     return false;

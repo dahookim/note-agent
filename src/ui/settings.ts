@@ -6,6 +6,7 @@
 import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import type OSBAPlugin from '../main';
 import { OSBASettings, DEFAULT_SETTINGS, ProviderType } from '../types';
+import { ProgressModal } from './progress-modal';
 
 export class OSBASettingTab extends PluginSettingTab {
   plugin: OSBAPlugin;
@@ -245,19 +246,60 @@ export class OSBASettingTab extends PluginSettingTab {
 
     containerEl.createEl('h2', { text: '⚙️ 처리 설정' });
 
+    // 인덱싱 모드 선택
     new Setting(containerEl)
-      .setName('제외 폴더')
-      .setDesc('임베딩 및 분석에서 제외할 폴더 (쉼표로 구분)')
-      .addTextArea(text => text
-        .setPlaceholder('templates, .obsidian, archive')
-        .setValue(this.plugin.settings.excludedFolders.join(', '))
+      .setName('인덱싱 모드')
+      .setDesc('폴더 인덱싱 방식을 선택하세요')
+      .addDropdown(dropdown => dropdown
+        .addOption('exclude', '🚫 제외 모드: 지정 폴더만 제외')
+        .addOption('include', '✅ 포함 모드: 지정 폴더만 인덱싱')
+        .setValue(this.plugin.settings.indexingMode)
         .onChange(async (value) => {
-          this.plugin.settings.excludedFolders = value
-            .split(',')
-            .map(f => f.trim())
-            .filter(f => f.length > 0);
+          this.plugin.settings.indexingMode = value as 'exclude' | 'include';
           await this.plugin.saveSettings();
+          this.display(); // 화면 새로고침하여 해당 폴더 입력 필드 표시
         }));
+
+    // 인덱싱 모드에 따라 다른 폴더 설정 표시
+    if (this.plugin.settings.indexingMode === 'exclude') {
+      // 제외 모드: 제외할 폴더 목록
+      new Setting(containerEl)
+        .setName('제외 폴더')
+        .setDesc('임베딩 및 분석에서 제외할 폴더 (쉼표로 구분). 나머지 모든 폴더가 인덱싱됩니다.')
+        .addTextArea(text => text
+          .setPlaceholder('templates, .obsidian, archive')
+          .setValue(this.plugin.settings.excludedFolders.join(', '))
+          .onChange(async (value) => {
+            this.plugin.settings.excludedFolders = value
+              .split(',')
+              .map(f => f.trim())
+              .filter(f => f.length > 0);
+            await this.plugin.saveSettings();
+          }));
+    } else {
+      // 포함 모드: 인덱싱할 폴더 목록
+      new Setting(containerEl)
+        .setName('포함 폴더')
+        .setDesc('임베딩 및 분석에 포함할 폴더만 입력 (쉼표로 구분). 지정한 폴더만 인덱싱됩니다.')
+        .addTextArea(text => text
+          .setPlaceholder('notes, projects, journal')
+          .setValue(this.plugin.settings.includedFolders.join(', '))
+          .onChange(async (value) => {
+            this.plugin.settings.includedFolders = value
+              .split(',')
+              .map(f => f.trim())
+              .filter(f => f.length > 0);
+            await this.plugin.saveSettings();
+          }));
+
+      // 포함 모드 안내 메시지
+      if (this.plugin.settings.includedFolders.length === 0) {
+        containerEl.createEl('p', {
+          text: '⚠️ 포함 폴더가 지정되지 않았습니다. 아무 노트도 인덱싱되지 않습니다.',
+          cls: 'osba-warning'
+        });
+      }
+    }
 
     new Setting(containerEl)
       .setName('제외 태그')
@@ -388,9 +430,44 @@ export class OSBASettingTab extends PluginSettingTab {
         .setButtonText('인덱싱 시작')
         .setCta()
         .onClick(async () => {
-          new Notice('볼트 인덱싱을 시작합니다...');
-          // main.ts의 batch index 커맨드 호출
-          (this.app as any).commands.executeCommandById('osba:batch-index');
+          const modal = new ProgressModal(this.app, '볼트 인덱싱');
+          modal.open();
+          modal.updateState({ message: '인덱싱 준비 중...' });
+
+          try {
+            // Job Queue의 진행 상황을 추적
+            const files = this.app.vault.getMarkdownFiles()
+              .filter((f) => !this.plugin.isExcluded(f));
+
+            const total = files.length;
+            let processed = 0;
+
+            modal.updateState({
+              message: `총 ${total}개 노트 인덱싱 시작`,
+              subMessage: '잠시 기다려주세요...'
+            });
+
+            for (const file of files) {
+              try {
+                await this.plugin.embeddingService?.processNote(file);
+                processed++;
+                const progress = Math.round((processed / total) * 100);
+                modal.updateProgress(progress, `${processed}/${total} 처리 중`);
+                modal.updateState({
+                  subMessage: file.basename
+                });
+              } catch (err) {
+                console.error(`Failed to index ${file.path}:`, err);
+                // Continue with next file
+              }
+            }
+
+            modal.complete(`✅ ${processed}/${total} 노트 인덱싱 완료!`);
+            setTimeout(() => modal.close(), 2000);
+
+          } catch (error) {
+            modal.setError(error instanceof Error ? error.message : '인덱싱 실패');
+          }
         }));
 
     new Setting(containerEl)
@@ -401,8 +478,18 @@ export class OSBASettingTab extends PluginSettingTab {
         .setWarning()
         .onClick(async () => {
           if (confirm('모든 캐시를 삭제하시겠습니까?')) {
-            await this.plugin.database.clearCache();
-            new Notice('캐시가 삭제되었습니다.');
+            const modal = new ProgressModal(this.app, '캐시 초기화');
+            modal.open();
+            modal.updateProgress(30, '캐시 데이터 삭제 중...');
+
+            try {
+              await this.plugin.database?.clearCache();
+              modal.updateProgress(100);
+              modal.complete('캐시가 삭제되었습니다!');
+              setTimeout(() => modal.close(), 1500);
+            } catch (error) {
+              modal.setError(error instanceof Error ? error.message : '캐시 삭제 실패');
+            }
           }
         }));
 
@@ -414,10 +501,23 @@ export class OSBASettingTab extends PluginSettingTab {
         .setWarning()
         .onClick(async () => {
           if (confirm('모든 설정을 초기화하시겠습니까?')) {
-            this.plugin.settings = { ...DEFAULT_SETTINGS };
-            await this.plugin.saveSettings();
-            this.display(); // 화면 새로고침
-            new Notice('설정이 초기화되었습니다.');
+            const modal = new ProgressModal(this.app, '설정 초기화');
+            modal.open();
+            modal.updateProgress(50, '설정 초기화 중...');
+
+            try {
+              this.plugin.settings = { ...DEFAULT_SETTINGS };
+              await this.plugin.saveSettings();
+              modal.updateProgress(100);
+              modal.complete('설정이 초기화되었습니다!');
+
+              setTimeout(() => {
+                modal.close();
+                this.display(); // 화면 새로고침
+              }, 1500);
+            } catch (error) {
+              modal.setError(error instanceof Error ? error.message : '설정 초기화 실패');
+            }
           }
         }));
 
@@ -433,12 +533,30 @@ export class OSBASettingTab extends PluginSettingTab {
   private async displayStatistics(containerEl: HTMLElement): Promise<void> {
     const statsContainer = containerEl.createDiv({ cls: 'osba-stats' });
 
+    // 서비스 초기화 상태 확인
+    if (!this.plugin.database || !this.plugin.embeddingService) {
+      statsContainer.createEl('p', {
+        text: '⏳ 서비스 초기화 중입니다. 잠시 후 설정을 다시 열어주세요.',
+        cls: 'osba-warning',
+      });
+      return;
+    }
+
     try {
+      // 로딩 표시
+      const loadingEl = statsContainer.createEl('p', {
+        text: '통계 로딩 중...',
+        cls: 'osba-loading',
+      });
+
       const [indexStats, usageDaily, usageMonthly] = await Promise.all([
-        this.plugin.embeddingService?.getIndexingStats(),
-        this.plugin.database?.getUsageSummary('day'),
-        this.plugin.database?.getUsageSummary('month'),
+        this.plugin.embeddingService.getIndexingStats(),
+        this.plugin.database.getUsageSummary('day'),
+        this.plugin.database.getUsageSummary('month'),
       ]);
+
+      // 로딩 표시 제거
+      loadingEl.remove();
 
       // 인덱싱 통계
       if (indexStats) {
@@ -448,11 +566,16 @@ export class OSBASettingTab extends PluginSettingTab {
         this.addStatRow(indexTable, '전체 노트', `${indexStats.totalNotes}개`);
         this.addStatRow(indexTable, '인덱싱 완료', `${indexStats.indexedNotes}개`);
         this.addStatRow(indexTable, '대기 중', `${indexStats.pendingNotes}개`);
-        this.addStatRow(
-          indexTable,
-          '진행률',
-          `${((indexStats.indexedNotes / indexStats.totalNotes) * 100).toFixed(1)}%`
-        );
+
+        const progress = indexStats.totalNotes > 0
+          ? ((indexStats.indexedNotes / indexStats.totalNotes) * 100).toFixed(1)
+          : '0.0';
+        this.addStatRow(indexTable, '진행률', `${progress}%`);
+      } else {
+        statsContainer.createEl('p', {
+          text: '인덱싱 통계를 불러올 수 없습니다.',
+          cls: 'osba-info',
+        });
       }
 
       // 사용량 통계
@@ -472,10 +595,16 @@ export class OSBASettingTab extends PluginSettingTab {
         );
         this.addStatRow(usageTable, '오늘 요청 수', `${usageDaily.requestCount}회`);
         this.addStatRow(usageTable, '이번 달 요청 수', `${usageMonthly.requestCount}회`);
+      } else {
+        statsContainer.createEl('p', {
+          text: '사용량 통계를 불러올 수 없습니다.',
+          cls: 'osba-info',
+        });
       }
     } catch (error) {
+      console.error('Statistics load error:', error);
       statsContainer.createEl('p', {
-        text: '통계를 불러오는 중 오류가 발생했습니다.',
+        text: `통계를 불러오는 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`,
         cls: 'osba-error',
       });
     }

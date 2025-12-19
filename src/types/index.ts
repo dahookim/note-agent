@@ -31,7 +31,9 @@ export interface OSBASettings {
   budgetAlertThreshold: number;  // percentage (0-100)
 
   // Processing Settings
+  indexingMode: 'exclude' | 'include';  // 제외 모드 또는 포함 모드
   excludedFolders: string[];
+  includedFolders: string[];  // 포함 모드일 때 인덱싱할 폴더들
   excludedTags: string[];
   maxNoteSize: number;  // bytes
   batchSize: number;
@@ -66,7 +68,9 @@ export const DEFAULT_SETTINGS: OSBASettings = {
   enableBudgetAlerts: true,
   budgetAlertThreshold: 80,
 
+  indexingMode: 'exclude',  // 기본값: 제외 모드
   excludedFolders: ['templates', '.obsidian'],
+  includedFolders: [],  // 포함 모드일 때 사용
   excludedTags: ['private', 'draft'],
   maxNoteSize: 50 * 1024,  // 50KB
   batchSize: 10,

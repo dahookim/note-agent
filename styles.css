@@ -886,3 +886,204 @@
   outline: 2px solid var(--osba-primary);
   outline-offset: 2px;
 }
+
+/* ============================================
+   Progress Modal
+   ============================================ */
+
+.osba-progress-modal {
+  min-width: 400px;
+  max-width: 500px;
+  padding: 24px;
+}
+
+.osba-progress-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 20px 0;
+  font-size: 1.3em;
+  color: var(--osba-text-primary);
+}
+
+.osba-progress-icon {
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+.osba-progress-modal .osba-progress-container {
+  margin: 16px 0;
+}
+
+.osba-progress-track {
+  height: 10px;
+  background: var(--osba-bg-tertiary);
+  border-radius: 5px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.osba-progress-modal .osba-progress-bar {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.osba-progress-modal .osba-progress-bar.running {
+  background: linear-gradient(90deg, var(--osba-primary), var(--osba-info));
+  animation: osba-progress-shimmer 1.5s infinite;
+}
+
+.osba-progress-modal .osba-progress-bar.completed {
+  background: linear-gradient(90deg, var(--osba-success), #10b981);
+}
+
+.osba-progress-modal .osba-progress-bar.error {
+  background: linear-gradient(90deg, var(--osba-error), #dc2626);
+}
+
+.osba-progress-modal .osba-progress-bar.cancelled {
+  background: linear-gradient(90deg, var(--osba-warning), #d97706);
+}
+
+@keyframes osba-progress-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.osba-progress-text {
+  text-align: right;
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--osba-text-secondary);
+  margin-top: 8px;
+}
+
+.osba-progress-message {
+  font-size: 1em;
+  color: var(--osba-text-primary);
+  margin: 16px 0 8px 0;
+  font-weight: 500;
+}
+
+.osba-progress-submessage {
+  font-size: 0.85em;
+  color: var(--osba-text-secondary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.osba-progress-submessage.osba-error-text {
+  color: var(--osba-error);
+  background: rgba(239, 68, 68, 0.1);
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-top: 8px;
+  white-space: normal;
+}
+
+.osba-progress-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  justify-content: flex-end;
+}
+
+.osba-btn {
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.osba-btn-cancel {
+  background: var(--osba-bg-tertiary);
+  color: var(--osba-text-primary);
+}
+
+.osba-btn-cancel:hover {
+  background: var(--osba-border);
+}
+
+.osba-btn-close {
+  background: var(--osba-primary);
+  color: white;
+}
+
+.osba-btn-close:hover {
+  background: var(--osba-primary-hover);
+}
+
+/* ============================================
+   Settings Stats Section
+   ============================================ */
+
+.osba-stats {
+  background: var(--osba-bg-secondary);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.osba-stats h3 {
+  margin: 16px 0 12px 0;
+  font-size: 1em;
+  color: var(--osba-text-primary);
+}
+
+.osba-stats h3:first-child {
+  margin-top: 0;
+}
+
+.osba-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.osba-stats-table tr {
+  border-bottom: 1px solid var(--osba-border);
+}
+
+.osba-stats-table tr:last-child {
+  border-bottom: none;
+}
+
+.osba-stats-table td {
+  padding: 8px 0;
+}
+
+.osba-stats-table td:first-child {
+  color: var(--osba-text-secondary);
+}
+
+.osba-stats-table td:last-child {
+  text-align: right;
+  font-weight: 500;
+  color: var(--osba-text-primary);
+}
+
+.osba-warning {
+  color: var(--osba-warning);
+  padding: 12px;
+  background: rgba(245, 158, 11, 0.1);
+  border-radius: 6px;
+  border-left: 3px solid var(--osba-warning);
+}
+
+.osba-info {
+  color: var(--osba-info);
+  padding: 12px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 6px;
+  border-left: 3px solid var(--osba-info);
+}
