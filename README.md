@@ -429,7 +429,10 @@ Gemini Flash만 사용
 
 ## 라이선스
 
-MIT License - 자유롭게 사용, 수정, 배포 가능
+MIT License
+
+본 소프트웨어는 자유롭게 사용, 수정, 배포할 수 있습니다.
+단, **재배포 시 반드시 원저작자(Master of Learning / 배움의 달인)와 원본 링크를 명시해야 합니다.**
 
 ---
 ## 📞 Connect with Me
