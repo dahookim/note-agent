@@ -1,0 +1,888 @@
+/**
+ * Obsidian Second Brain Agent - Styles
+ * 플러그인 UI 스타일시트
+ */
+
+/* ============================================
+   CSS Variables
+   ============================================ */
+
+.theme-light {
+  --osba-primary: #6366f1;
+  --osba-primary-hover: #4f46e5;
+  --osba-secondary: #8b5cf6;
+  --osba-success: #10b981;
+  --osba-warning: #f59e0b;
+  --osba-error: #ef4444;
+  --osba-info: #3b82f6;
+  --osba-bg-primary: #ffffff;
+  --osba-bg-secondary: #f8fafc;
+  --osba-bg-tertiary: #f1f5f9;
+  --osba-border: #e2e8f0;
+  --osba-text-primary: #1e293b;
+  --osba-text-secondary: #64748b;
+  --osba-text-muted: #94a3b8;
+  --osba-shadow: rgba(0, 0, 0, 0.1);
+}
+
+.theme-dark {
+  --osba-primary: #818cf8;
+  --osba-primary-hover: #a5b4fc;
+  --osba-secondary: #a78bfa;
+  --osba-success: #34d399;
+  --osba-warning: #fbbf24;
+  --osba-error: #f87171;
+  --osba-info: #60a5fa;
+  --osba-bg-primary: #1e1e1e;
+  --osba-bg-secondary: #252526;
+  --osba-bg-tertiary: #2d2d2d;
+  --osba-border: #3e3e42;
+  --osba-text-primary: #e4e4e7;
+  --osba-text-secondary: #a1a1aa;
+  --osba-text-muted: #71717a;
+  --osba-shadow: rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   Modal Base Styles
+   ============================================ */
+
+.osba-modal {
+  max-width: 700px;
+  padding: 20px;
+}
+
+.osba-modal h2 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  color: var(--osba-text-primary);
+  font-size: 1.5em;
+}
+
+.osba-modal-desc {
+  color: var(--osba-text-secondary);
+  margin-bottom: 20px;
+  font-size: 0.9em;
+}
+
+/* ============================================
+   Button Styles
+   ============================================ */
+
+.osba-button-container {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  justify-content: flex-end;
+}
+
+.osba-button-container button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.osba-action-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.osba-action-buttons button {
+  flex: 1;
+  min-width: 120px;
+}
+
+/* ============================================
+   Loading & Status States
+   ============================================ */
+
+.osba-loading {
+  color: var(--osba-text-secondary);
+  font-style: italic;
+  padding: 20px;
+  text-align: center;
+}
+
+.osba-loading::before {
+  content: '';
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--osba-border);
+  border-top-color: var(--osba-primary);
+  border-radius: 50%;
+  animation: osba-spin 0.8s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+@keyframes osba-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.osba-error {
+  color: var(--osba-error);
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 6px;
+  border-left: 3px solid var(--osba-error);
+}
+
+.osba-empty {
+  color: var(--osba-text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 30px 20px;
+}
+
+/* ============================================
+   Cost Display
+   ============================================ */
+
+.osba-cost {
+  color: var(--osba-text-secondary);
+  font-size: 0.85em;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--osba-bg-tertiary);
+  border-radius: 6px;
+  display: inline-block;
+}
+
+/* ============================================
+   Result Container
+   ============================================ */
+
+.osba-result-container {
+  margin-top: 20px;
+}
+
+.osba-draft-result {
+  background: var(--osba-bg-secondary);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.osba-draft-result h4 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  color: var(--osba-text-primary);
+}
+
+.osba-markdown-preview {
+  background: var(--osba-bg-primary);
+  border: 1px solid var(--osba-border);
+  border-radius: 6px;
+  padding: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* ============================================
+   Related Notes Section
+   ============================================ */
+
+.osba-related-notes {
+  background: var(--osba-bg-tertiary);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.osba-related-notes h4 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 0.95em;
+  color: var(--osba-text-secondary);
+}
+
+.osba-related-notes ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.osba-related-notes li {
+  margin-bottom: 4px;
+}
+
+/* ============================================
+   Section Styles
+   ============================================ */
+
+.osba-section {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--osba-border);
+}
+
+.osba-section h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 1.1em;
+  color: var(--osba-text-primary);
+}
+
+/* ============================================
+   Connection List
+   ============================================ */
+
+.osba-connection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.osba-connection-item {
+  background: var(--osba-bg-secondary);
+  border-radius: 8px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--osba-primary);
+}
+
+.osba-connection-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.osba-relation-icon {
+  font-size: 1.1em;
+}
+
+.osba-confidence {
+  color: var(--osba-text-muted);
+  font-size: 0.85em;
+  margin-left: auto;
+}
+
+.osba-reasoning {
+  color: var(--osba-text-secondary);
+  font-size: 0.9em;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ============================================
+   Knowledge Gap List
+   ============================================ */
+
+.osba-gap-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.osba-gap-item {
+  background: var(--osba-bg-secondary);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.osba-gap-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.osba-gap-item p {
+  color: var(--osba-text-secondary);
+  font-size: 0.9em;
+  margin: 8px 0;
+}
+
+.osba-resources {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  color: var(--osba-text-secondary);
+  font-size: 0.85em;
+}
+
+/* ============================================
+   Similar Notes List
+   ============================================ */
+
+.osba-similar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.osba-similar-item {
+  background: var(--osba-bg-secondary);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.osba-similar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.osba-similarity-badge {
+  background: var(--osba-primary);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  font-weight: 500;
+}
+
+.osba-similarity-bar-container {
+  height: 4px;
+  background: var(--osba-border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.osba-similarity-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--osba-primary), var(--osba-secondary));
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.osba-snippet {
+  color: var(--osba-text-secondary);
+  font-size: 0.85em;
+  margin: 0;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ============================================
+   Progress Bar (Batch Modal)
+   ============================================ */
+
+.osba-progress-container {
+  height: 8px;
+  background: var(--osba-border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 16px 0;
+}
+
+.osba-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--osba-primary), var(--osba-success));
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.osba-status {
+  font-weight: 500;
+  color: var(--osba-text-primary);
+  margin-bottom: 8px;
+}
+
+.osba-current-file {
+  color: var(--osba-text-secondary);
+  font-size: 0.9em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ============================================
+   Sidebar Views
+   ============================================ */
+
+.osba-view {
+  padding: 12px;
+}
+
+.osba-view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--osba-border);
+}
+
+.osba-view-header h4 {
+  margin: 0;
+  font-size: 1em;
+  color: var(--osba-text-primary);
+}
+
+.osba-view-content {
+  min-height: 100px;
+}
+
+/* ============================================
+   Job Queue View
+   ============================================ */
+
+.osba-job-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.osba-job-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--osba-bg-secondary);
+  border-radius: 6px;
+  border-left: 3px solid var(--osba-border);
+}
+
+.osba-job-item.pending {
+  border-left-color: var(--osba-text-muted);
+}
+
+.osba-job-item.processing {
+  border-left-color: var(--osba-info);
+}
+
+.osba-job-item.completed {
+  border-left-color: var(--osba-success);
+}
+
+.osba-job-item.failed {
+  border-left-color: var(--osba-error);
+}
+
+.osba-job-status {
+  font-size: 1.2em;
+  flex-shrink: 0;
+}
+
+.osba-job-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.osba-job-type {
+  font-weight: 500;
+  color: var(--osba-text-primary);
+  font-size: 0.9em;
+}
+
+.osba-job-path {
+  color: var(--osba-text-secondary);
+  font-size: 0.8em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ============================================
+   Cost Dashboard View
+   ============================================ */
+
+.osba-cost-section {
+  background: var(--osba-bg-secondary);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+
+.osba-cost-section h5 {
+  margin: 0 0 8px;
+  font-size: 0.9em;
+  color: var(--osba-text-secondary);
+}
+
+.osba-cost-amount {
+  font-size: 1.4em;
+  font-weight: 600;
+  color: var(--osba-text-primary);
+}
+
+.osba-cost-budget {
+  color: var(--osba-text-muted);
+  font-size: 0.85em;
+}
+
+.osba-budget-bar {
+  height: 6px;
+  background: var(--osba-border);
+  border-radius: 3px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.osba-budget-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.osba-budget-fill.safe {
+  background: var(--osba-success);
+}
+
+.osba-budget-fill.warning {
+  background: var(--osba-warning);
+}
+
+.osba-budget-fill.danger {
+  background: var(--osba-error);
+}
+
+.osba-cost-requests {
+  color: var(--osba-text-muted);
+  font-size: 0.8em;
+  margin-top: 6px;
+}
+
+/* ============================================
+   Provider Stats
+   ============================================ */
+
+.osba-provider-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.osba-provider-stat {
+  background: var(--osba-bg-tertiary);
+  border-radius: 6px;
+  padding: 10px;
+  text-align: center;
+}
+
+.osba-provider-name {
+  font-size: 0.75em;
+  color: var(--osba-text-muted);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.osba-provider-cost {
+  font-weight: 600;
+  color: var(--osba-text-primary);
+  font-size: 0.95em;
+}
+
+/* ============================================
+   Recent Usage
+   ============================================ */
+
+.osba-recent-usage {
+  margin-top: 16px;
+}
+
+.osba-recent-usage h5 {
+  font-size: 0.9em;
+  color: var(--osba-text-secondary);
+  margin-bottom: 8px;
+}
+
+.osba-usage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.osba-usage-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--osba-bg-secondary);
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+.osba-usage-operation {
+  color: var(--osba-text-primary);
+}
+
+.osba-usage-cost {
+  color: var(--osba-text-secondary);
+}
+
+/* ============================================
+   Similar Notes View
+   ============================================ */
+
+.osba-similar-notes-view .osba-similar-item {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.osba-similar-notes-view .osba-similar-item:hover {
+  background: var(--osba-bg-tertiary);
+}
+
+.osba-similarity-high {
+  background: var(--osba-success) !important;
+}
+
+.osba-similarity-medium {
+  background: var(--osba-warning) !important;
+}
+
+.osba-similarity-low {
+  background: var(--osba-text-muted) !important;
+}
+
+/* ============================================
+   Knowledge Graph View
+   ============================================ */
+
+.osba-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.osba-stat-card {
+  background: var(--osba-bg-secondary);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+
+.osba-stat-value {
+  font-size: 1.5em;
+  font-weight: 600;
+  color: var(--osba-primary);
+}
+
+.osba-stat-label {
+  font-size: 0.8em;
+  color: var(--osba-text-secondary);
+  margin-top: 4px;
+}
+
+.osba-connection-types,
+.osba-gap-priorities {
+  margin-top: 16px;
+}
+
+.osba-connection-types h5,
+.osba-gap-priorities h5 {
+  font-size: 0.9em;
+  color: var(--osba-text-secondary);
+  margin-bottom: 8px;
+}
+
+.osba-type-list,
+.osba-priority-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.osba-type-badge,
+.osba-priority-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--osba-bg-secondary);
+  border-radius: 20px;
+  font-size: 0.85em;
+}
+
+.osba-type-count,
+.osba-priority-count {
+  background: var(--osba-bg-tertiary);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+  color: var(--osba-text-primary);
+}
+
+/* Priority Colors */
+.osba-priority-high {
+  border-left: 3px solid var(--osba-error);
+}
+
+.osba-priority-medium {
+  border-left: 3px solid var(--osba-warning);
+}
+
+.osba-priority-low {
+  border-left: 3px solid var(--osba-success);
+}
+
+/* ============================================
+   Settings Tab
+   ============================================ */
+
+.osba-settings-section {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--osba-border);
+}
+
+.osba-settings-section:last-child {
+  border-bottom: none;
+}
+
+.osba-settings-section h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 1.1em;
+  color: var(--osba-text-primary);
+}
+
+.osba-api-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.85em;
+}
+
+.osba-api-status.connected {
+  color: var(--osba-success);
+}
+
+.osba-api-status.disconnected {
+  color: var(--osba-error);
+}
+
+.osba-api-status.testing {
+  color: var(--osba-info);
+}
+
+/* ============================================
+   Internal Link Styling
+   ============================================ */
+
+.osba-modal .internal-link,
+.osba-view .internal-link {
+  color: var(--osba-primary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.osba-modal .internal-link:hover,
+.osba-view .internal-link:hover {
+  color: var(--osba-primary-hover);
+  text-decoration: underline;
+}
+
+/* ============================================
+   Scrollbar Styling
+   ============================================ */
+
+.osba-modal ::-webkit-scrollbar,
+.osba-view ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.osba-modal ::-webkit-scrollbar-track,
+.osba-view ::-webkit-scrollbar-track {
+  background: var(--osba-bg-tertiary);
+  border-radius: 4px;
+}
+
+.osba-modal ::-webkit-scrollbar-thumb,
+.osba-view ::-webkit-scrollbar-thumb {
+  background: var(--osba-border);
+  border-radius: 4px;
+}
+
+.osba-modal ::-webkit-scrollbar-thumb:hover,
+.osba-view ::-webkit-scrollbar-thumb:hover {
+  background: var(--osba-text-muted);
+}
+
+/* ============================================
+   Responsive Design
+   ============================================ */
+
+@media (max-width: 600px) {
+  .osba-modal {
+    padding: 16px;
+  }
+
+  .osba-action-buttons {
+    flex-direction: column;
+  }
+
+  .osba-action-buttons button {
+    width: 100%;
+  }
+
+  .osba-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .osba-provider-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+
+@keyframes osba-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.osba-result-container,
+.osba-job-item,
+.osba-similar-item,
+.osba-connection-item,
+.osba-gap-item {
+  animation: osba-fade-in 0.3s ease;
+}
+
+/* ============================================
+   Accessibility
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .osba-loading::before {
+    animation: none;
+  }
+
+  .osba-result-container,
+  .osba-job-item,
+  .osba-similar-item,
+  .osba-connection-item,
+  .osba-gap-item {
+    animation: none;
+  }
+
+  .osba-progress-bar,
+  .osba-budget-fill,
+  .osba-similarity-bar {
+    transition: none;
+  }
+}
+
+/* Focus states for keyboard navigation */
+.osba-modal button:focus-visible,
+.osba-view button:focus-visible,
+.osba-modal .internal-link:focus-visible,
+.osba-view .internal-link:focus-visible {
+  outline: 2px solid var(--osba-primary);
+  outline-offset: 2px;
+}

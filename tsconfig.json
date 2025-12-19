@@ -1,0 +1,48 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "inlineSourceMap": true,
+    "inlineSources": true,
+    "module": "ESNext",
+    "target": "ES2018",
+    "allowJs": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strict": true,
+    "moduleResolution": "node",
+    "importHelpers": true,
+    "alwaysStrict": true,
+    "declaration": true,
+    "declarationMap": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "lib": [
+      "DOM",
+      "ES2018",
+      "ES2019.Array",
+      "ES2020.Promise"
+    ],
+    "types": [
+      "node"
+    ],
+    "paths": {
+      "@api/*": ["src/api/*"],
+      "@core/*": ["src/core/*"],
+      "@db/*": ["src/db/*"],
+      "@ui/*": ["src/ui/*"],
+      "@types/*": ["src/types/*"]
+    }
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
