@@ -12,11 +12,17 @@ export interface OSBASettings {
   geminiApiKey: string;
   claudeApiKey: string;
   openaiApiKey: string;
+  xaiApiKey: string;  // xAI Grok API key
 
   // Model Selection
-  quickDraftModel: 'gemini-flash' | 'gemini-pro' | 'claude-sonnet';
-  analysisModel: 'claude-sonnet' | 'claude-opus' | 'gemini-pro';
+  quickDraftModel: 'gemini-flash' | 'gemini-2.5-flash' | 'gemini-pro' | 'claude-sonnet' | 'grok-4-fast';
+  analysisModel: 'claude-sonnet' | 'claude-opus' | 'gemini-pro' | 'grok-4-fast';
   embeddingModel: 'openai-small' | 'openai-large';
+
+  // Custom Model Names (for manual override)
+  useCustomModels: boolean;
+  customQuickDraftModel: string;
+  customAnalysisModel: string;
 
   // Budget Settings
   dailyBudgetLimit: number;  // USD
@@ -45,10 +51,15 @@ export const DEFAULT_SETTINGS: OSBASettings = {
   geminiApiKey: '',
   claudeApiKey: '',
   openaiApiKey: '',
+  xaiApiKey: '',
 
   quickDraftModel: 'gemini-flash',
   analysisModel: 'claude-sonnet',
   embeddingModel: 'openai-small',
+
+  useCustomModels: false,
+  customQuickDraftModel: '',
+  customAnalysisModel: '',
 
   dailyBudgetLimit: 1.00,
   monthlyBudgetLimit: 10.00,
@@ -110,7 +121,7 @@ export interface AIProvider {
   testConnection(): Promise<{ success: boolean; error?: string }>;
 }
 
-export type ProviderType = 'gemini' | 'claude' | 'openai';
+export type ProviderType = 'gemini' | 'claude' | 'openai' | 'xai';
 
 // ============================================
 // Note & Analysis Types
@@ -144,7 +155,7 @@ export interface NoteConnection {
   targetNoteId: number;
   relationType: RelationType;
   confidence: number;  // 0-1
-  reasoning: string;
+  reasoning?: string;
   createdAt: Date;
 }
 
@@ -152,7 +163,7 @@ export interface KnowledgeGap {
   id: number;
   noteId: number;
   topic: string;
-  description: string;
+  description?: string;
   priority: GapPriority;
   suggestedResources?: string[];
   createdAt: Date;

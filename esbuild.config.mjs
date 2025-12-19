@@ -31,8 +31,6 @@ const context = await esbuild.context({
     '@lezer/common',
     '@lezer/highlight',
     '@lezer/lr',
-    'better-sqlite3',
-    'sqlite-vec',
     ...builtins,
     // Node.js built-in modules with node: prefix
     'node:path',

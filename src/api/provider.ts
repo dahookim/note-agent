@@ -33,6 +33,14 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     maxInputTokens: 1000000,
     maxOutputTokens: 8192,
   },
+  'gemini-2.5-flash': {
+    id: 'gemini-2.5-flash-preview-05-20',
+    provider: 'gemini',
+    inputCostPer1M: 0.15,
+    outputCostPer1M: 0.60,
+    maxInputTokens: 1048576,  // 1M tokens
+    maxOutputTokens: 65536,    // 64K output tokens
+  },
   'gemini-pro': {
     id: 'gemini-1.5-pro',
     provider: 'gemini',
@@ -58,6 +66,16 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     outputCostPer1M: 75.00,
     maxInputTokens: 200000,
     maxOutputTokens: 4096,
+  },
+
+  // xAI Grok Models
+  'grok-4-fast': {
+    id: 'grok-4-1-fast',
+    provider: 'xai',
+    inputCostPer1M: 2.00,      // Estimated pricing
+    outputCostPer1M: 10.00,
+    maxInputTokens: 131072,    // 128K context window
+    maxOutputTokens: 131072,   // Large output support
   },
 
   // OpenAI Embedding Models
@@ -87,6 +105,7 @@ const API_ENDPOINTS = {
   gemini: 'https://generativelanguage.googleapis.com/v1beta',
   claude: 'https://api.anthropic.com/v1',
   openai: 'https://api.openai.com/v1',
+  xai: 'https://api.x.ai/v1',  // xAI Grok API endpoint
 };
 
 // ============================================
@@ -114,7 +133,10 @@ export class AIProviderManager {
     prompt: string,
     options: GenerateOptions = {}
   ): Promise<GenerateResult> {
-    const config = MODEL_CONFIGS[modelKey];
+    // Check for custom model override
+    const resolvedModelKey = this.resolveModelKey(modelKey);
+    const config = this.getResolvedModelConfig(resolvedModelKey, modelKey);
+
     if (!config) {
       throw new APIError(`Unknown model: ${modelKey}`, 'gemini', 400);
     }
@@ -124,9 +146,50 @@ export class AIProviderManager {
         return this.generateWithGemini(config, prompt, options);
       case 'claude':
         return this.generateWithClaude(config, prompt, options);
+      case 'xai':
+        return this.generateWithXAI(config, prompt, options);
       default:
         throw new APIError(`Provider ${config.provider} does not support text generation`, config.provider, 400);
     }
+  }
+
+  // Resolve model key with custom model support
+  private resolveModelKey(modelKey: string): string {
+    if (!this.settings.useCustomModels) {
+      return modelKey;
+    }
+
+    // Map standard model keys to custom models if configured
+    if (modelKey === this.settings.quickDraftModel && this.settings.customQuickDraftModel) {
+      return this.settings.customQuickDraftModel;
+    }
+    if (modelKey === this.settings.analysisModel && this.settings.customAnalysisModel) {
+      return this.settings.customAnalysisModel;
+    }
+
+    return modelKey;
+  }
+
+  // Get model config, supporting custom model IDs
+  private getResolvedModelConfig(resolvedKey: string, originalKey: string): ModelConfig | undefined {
+    // First check if it's a known model key
+    if (MODEL_CONFIGS[resolvedKey]) {
+      return MODEL_CONFIGS[resolvedKey];
+    }
+
+    // If custom model, create a dynamic config based on the original model type
+    if (this.settings.useCustomModels && resolvedKey !== originalKey) {
+      const baseConfig = MODEL_CONFIGS[originalKey];
+      if (baseConfig) {
+        return {
+          ...baseConfig,
+          id: resolvedKey,  // Use custom model ID
+        };
+      }
+    }
+
+    // Fallback to original key
+    return MODEL_CONFIGS[originalKey];
   }
 
   private async generateWithGemini(
@@ -246,6 +309,76 @@ export class AIProviderManager {
       cost: this.calculateCost(config, data.usage?.input_tokens || 0, data.usage?.output_tokens || 0),
       model: config.id,
       finishReason: data.stop_reason === 'end_turn' ? 'stop' : 'length',
+    };
+  }
+
+  private async generateWithXAI(
+    config: ModelConfig,
+    prompt: string,
+    options: GenerateOptions
+  ): Promise<GenerateResult> {
+    const apiKey = this.settings.xaiApiKey;
+    if (!apiKey) {
+      throw new APIError('xAI API key not configured', 'xai', 401);
+    }
+
+    const url = `${API_ENDPOINTS.xai}/chat/completions`;
+
+    const messages: Array<{ role: string; content: string }> = [];
+
+    if (options.systemPrompt) {
+      messages.push({ role: 'system', content: options.systemPrompt });
+    }
+
+    messages.push({ role: 'user', content: prompt });
+
+    const body: Record<string, unknown> = {
+      model: config.id,
+      messages,
+      max_tokens: options.maxTokens || config.maxOutputTokens,
+    };
+
+    if (options.temperature !== undefined) {
+      body.temperature = options.temperature;
+    }
+
+    if (options.topP !== undefined) {
+      body.top_p = options.topP;
+    }
+
+    if (options.stopSequences && options.stopSequences.length > 0) {
+      body.stop = options.stopSequences;
+    }
+
+    const response = await this.makeRequest({
+      url,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+    }, 'xai');
+
+    const data = JSON.parse(response);
+
+    if (!data.choices || data.choices.length === 0) {
+      throw new APIError('No response from xAI', 'xai', 500);
+    }
+
+    const choice = data.choices[0];
+    const text = choice.message?.content || '';
+
+    const inputTokens = data.usage?.prompt_tokens || this.estimateTokens(prompt);
+    const outputTokens = data.usage?.completion_tokens || this.estimateTokens(text);
+
+    return {
+      text,
+      inputTokens,
+      outputTokens,
+      cost: this.calculateCost(config, inputTokens, outputTokens),
+      model: config.id,
+      finishReason: choice.finish_reason === 'stop' ? 'stop' : 'length',
     };
   }
 
@@ -424,6 +557,13 @@ export class AIProviderManager {
           await this.generateEmbedding('test');
           return { success: true };
 
+        case 'xai':
+          if (!this.settings.xaiApiKey) {
+            return { success: false, error: 'API key not set' };
+          }
+          await this.generateText('grok-4-fast', 'Say "OK"', { maxTokens: 10 });
+          return { success: true };
+
         default:
           return { success: false, error: 'Unknown provider' };
       }
@@ -443,6 +583,8 @@ export class AIProviderManager {
         return !!this.settings.claudeApiKey;
       case 'openai':
         return !!this.settings.openaiApiKey;
+      case 'xai':
+        return !!this.settings.xaiApiKey;
       default:
         return false;
     }
@@ -458,7 +600,7 @@ export class AIProviderManager {
         if (type === 'embedding') {
           return config.provider === 'openai';
         }
-        return config.provider === 'gemini' || config.provider === 'claude';
+        return config.provider === 'gemini' || config.provider === 'claude' || config.provider === 'xai';
       })
       .filter(([_, config]) => this.isProviderConfigured(config.provider))
       .map(([key, _]) => key);

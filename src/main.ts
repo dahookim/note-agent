@@ -94,9 +94,40 @@ export default class OSBAPlugin extends Plugin {
 
   private async initializeServices(): Promise<void> {
     try {
-      // Initialize database
+      // Initialize database with Obsidian file adapter
       const dbPath = `${this.app.vault.configDir}/plugins/obsidian-second-brain-agent/osba.db`;
       this.database = new Database(dbPath);
+
+      // Set up persistence callbacks for sql.js database
+      const adapter = this.app.vault.adapter;
+
+      this.database.setSaveCallback(async (data: Uint8Array) => {
+        try {
+          // Ensure directory exists
+          const dirPath = `${this.app.vault.configDir}/plugins/obsidian-second-brain-agent`;
+          if (!(await adapter.exists(dirPath))) {
+            await adapter.mkdir(dirPath);
+          }
+          // Convert Uint8Array to ArrayBuffer for Obsidian's adapter
+          const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
+          await adapter.writeBinary(dbPath, buffer);
+        } catch (error) {
+          console.error('Failed to save database:', error);
+        }
+      });
+
+      this.database.setLoadCallback(async () => {
+        try {
+          if (await adapter.exists(dbPath)) {
+            const data = await adapter.readBinary(dbPath);
+            return new Uint8Array(data);
+          }
+        } catch (error) {
+          console.log('No existing database found, will create new one');
+        }
+        return null;
+      });
+
       await this.database.initialize();
 
       // Initialize AI provider manager

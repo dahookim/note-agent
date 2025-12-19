@@ -75,6 +75,22 @@ export class OSBASettingTab extends PluginSettingTab {
           await this.testConnection('openai');
         }));
 
+    new Setting(containerEl)
+      .setName('xAI API Key')
+      .setDesc('xAI Console에서 발급받은 API 키 (Grok 모델용, 128K 컨텍스트)')
+      .addText(text => text
+        .setPlaceholder('Enter xAI API key')
+        .setValue(this.plugin.settings.xaiApiKey)
+        .onChange(async (value) => {
+          this.plugin.settings.xaiApiKey = value;
+          await this.plugin.saveSettings();
+        }))
+      .addButton(button => button
+        .setButtonText('테스트')
+        .onClick(async () => {
+          await this.testConnection('xai');
+        }));
+
     // ============================================
     // Model Selection Section
     // ============================================
@@ -86,11 +102,13 @@ export class OSBASettingTab extends PluginSettingTab {
       .setDesc('빠른 초안 작성에 사용할 모델 (속도 우선)')
       .addDropdown(dropdown => dropdown
         .addOption('gemini-flash', 'Gemini 2.0 Flash ($0.075/1M)')
+        .addOption('gemini-2.5-flash', 'Gemini 2.5 Flash ($0.15/1M, 1M 컨텍스트)')
         .addOption('gemini-pro', 'Gemini 1.5 Pro ($1.25/1M)')
         .addOption('claude-sonnet', 'Claude 3.5 Sonnet ($3.00/1M)')
+        .addOption('grok-4-fast', 'Grok 4.1 Fast ($2.00/1M, 128K 컨텍스트)')
         .setValue(this.plugin.settings.quickDraftModel)
         .onChange(async (value) => {
-          this.plugin.settings.quickDraftModel = value as 'gemini-flash' | 'gemini-pro' | 'claude-sonnet';
+          this.plugin.settings.quickDraftModel = value as 'gemini-flash' | 'gemini-2.5-flash' | 'gemini-pro' | 'claude-sonnet' | 'grok-4-fast';
           await this.plugin.saveSettings();
         }));
 
@@ -101,9 +119,10 @@ export class OSBASettingTab extends PluginSettingTab {
         .addOption('claude-sonnet', 'Claude 3.5 Sonnet ($3.00/1M)')
         .addOption('claude-opus', 'Claude 3 Opus ($15.00/1M)')
         .addOption('gemini-pro', 'Gemini 1.5 Pro ($1.25/1M)')
+        .addOption('grok-4-fast', 'Grok 4.1 Fast ($2.00/1M, 128K 컨텍스트)')
         .setValue(this.plugin.settings.analysisModel)
         .onChange(async (value) => {
-          this.plugin.settings.analysisModel = value as 'claude-sonnet' | 'claude-opus' | 'gemini-pro';
+          this.plugin.settings.analysisModel = value as 'claude-sonnet' | 'claude-opus' | 'gemini-pro' | 'grok-4-fast';
           await this.plugin.saveSettings();
         }));
 
@@ -118,6 +137,51 @@ export class OSBASettingTab extends PluginSettingTab {
           this.plugin.settings.embeddingModel = value as 'openai-small' | 'openai-large';
           await this.plugin.saveSettings();
         }));
+
+    // ============================================
+    // Custom Model Settings Section
+    // ============================================
+
+    containerEl.createEl('h2', { text: '🔧 커스텀 모델 설정' });
+    containerEl.createEl('p', {
+      text: '드롭다운에 없는 모델을 직접 지정하려면 아래 설정을 활성화하세요.',
+      cls: 'setting-item-description'
+    });
+
+    new Setting(containerEl)
+      .setName('커스텀 모델 사용')
+      .setDesc('활성화하면 드롭다운 선택을 무시하고 아래 입력한 모델명을 사용합니다')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.useCustomModels)
+        .onChange(async (value) => {
+          this.plugin.settings.useCustomModels = value;
+          await this.plugin.saveSettings();
+          this.display(); // 화면 새로고침하여 커스텀 필드 표시/숨김
+        }));
+
+    if (this.plugin.settings.useCustomModels) {
+      new Setting(containerEl)
+        .setName('Quick Draft 커스텀 모델')
+        .setDesc('예: grok-4, gemini-2.5-flash-preview-05-20')
+        .addText(text => text
+          .setPlaceholder('모델 ID를 직접 입력')
+          .setValue(this.plugin.settings.customQuickDraftModel)
+          .onChange(async (value) => {
+            this.plugin.settings.customQuickDraftModel = value;
+            await this.plugin.saveSettings();
+          }));
+
+      new Setting(containerEl)
+        .setName('분석 커스텀 모델')
+        .setDesc('예: claude-3-5-sonnet-20241022, grok-4')
+        .addText(text => text
+          .setPlaceholder('모델 ID를 직접 입력')
+          .setValue(this.plugin.settings.customAnalysisModel)
+          .onChange(async (value) => {
+            this.plugin.settings.customAnalysisModel = value;
+            await this.plugin.saveSettings();
+          }));
+    }
 
     // ============================================
     // Budget Settings Section
