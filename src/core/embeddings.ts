@@ -450,14 +450,41 @@ export class EmbeddingService {
   }
 
   private isExcluded(path: string): boolean {
-    for (const folder of this.settings.excludedFolders) {
-      if (path.startsWith(folder + '/') || path === folder) {
+    // Get file for size check
+    const file = this.vault.getAbstractFileByPath(path);
+
+    // Check file size first (applies to both modes)
+    if (file instanceof TFile && file.stat.size > this.settings.maxNoteSize) {
+      return true;
+    }
+
+    // Check indexing mode
+    if (this.settings.indexingMode === 'include') {
+      // Include mode: only index files in includedFolders
+      if (this.settings.includedFolders.length === 0) {
+        // No folders specified, include nothing (exclude all)
         return true;
+      }
+
+      // Check if file is in any included folder
+      const isIncluded = this.settings.includedFolders.some(folder =>
+        path.startsWith(folder + '/') || path === folder
+      );
+
+      // If not in included folders, exclude it
+      if (!isIncluded) {
+        return true;
+      }
+    } else {
+      // Exclude mode (default): exclude files in excludedFolders
+      for (const folder of this.settings.excludedFolders) {
+        if (path.startsWith(folder + '/') || path === folder) {
+          return true;
+        }
       }
     }
 
     // 태그 기반 제외는 메타데이터 캐시에서 확인
-    const file = this.vault.getAbstractFileByPath(path);
     if (file instanceof TFile) {
       const cache = this.metadataCache.getFileCache(file);
       if (cache?.frontmatter?.tags) {

@@ -2,6 +2,15 @@
 
 All notable changes to OSBA (Obsidian Second Brain Agent) will be documented in this file.
 
+## [0.2.3] - 2025-12-20
+
+### Fixed
+- **Indexing Not Working**: Fixed critical issue where embeddings were not being created
+  - Cause: `embeddings.ts` `isExcluded` method was missing the new indexing mode logic
+  - The v0.2.1 indexing mode feature was only implemented in `main.ts` but not in `embeddings.ts`
+  - Now both files use consistent logic for `indexingMode`, `includedFolders`, and `maxNoteSize` checks
+  - Affected: All embedding/indexing operations were returning 0 indexed notes
+
 ## [0.2.2] - 2025-12-20
 
 ### Fixed
