@@ -166,6 +166,11 @@ export class QuickDraftModal extends Modal {
       // 제목 추출 또는 생성
       const firstLine = content.split('\n')[0];
       let title = firstLine.replace(/^#*\s*/, '').trim();
+
+      // Sanitize title: remove illegal characters for filenames
+      // Windows/Mac illegal chars: \ / : * ? " < > |
+      title = title.replace(/[\\/:*?"<>|]/g, '');
+
       if (!title) {
         title = `Quick Draft ${new Date().toISOString().slice(0, 10)}`;
       }

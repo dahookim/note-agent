@@ -211,6 +211,13 @@ export interface OSBAFrontmatter {
     priority: GapPriority;
   }[];
   clusters?: string[];
+  // Similar notes found via embedding search
+  similarNotes?: {
+    path: string;
+    title: string;
+    similarity: number;
+  }[];
+  similarNotesUpdated?: string;  // ISO8601
 }
 
 // ============================================

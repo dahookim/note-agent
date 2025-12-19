@@ -502,6 +502,14 @@ Generate the markdown content for the note:`;
       const content = await this.app.vault.read(file);
       const similar = await this.embeddingService.searchByQuery(content, 10);
 
+      // Save to frontmatter
+      const similarForFrontmatter = similar.map(n => ({
+        title: n.title,
+        path: n.notePath,
+        similarity: n.similarity
+      }));
+      await this.frontmatterManager.updateSimilarNotes(file, similarForFrontmatter);
+
       // Display results in a modal or notice
       if (similar.length === 0) {
         new Notice('No similar notes found. Try indexing your vault first.');
@@ -509,7 +517,7 @@ Generate the markdown content for the note:`;
         const resultText = similar
           .map((n, i) => `${i + 1}. ${n.title} (${(n.similarity * 100).toFixed(1)}%)`)
           .join('\n');
-        new Notice(`Similar notes:\n${resultText}`, 10000);
+        new Notice(`Similar notes saved to frontmatter!\n\nTop matches:\n${resultText}`, 5000);
       }
 
     } catch (error) {

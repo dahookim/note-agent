@@ -120,6 +120,34 @@ export class FrontmatterManager {
   }
 
   /**
+   * Update similar notes in frontmatter
+   * Saves the similar notes to YAML properties for persistent storage
+   */
+  async updateSimilarNotes(file: TFile, similarNotes: Array<{ title: string; path: string; similarity: number }>): Promise<void> {
+    const content = await this.app.vault.read(file);
+    const { frontmatter, body } = this.parseFrontmatter(content);
+
+    // Get or create OSBA namespace
+    const osbaData: OSBAFrontmatter = frontmatter.osba || { version: 1 };
+
+    // Update similar notes with timestamp
+    osbaData.similarNotes = similarNotes.map(note => ({
+      path: note.path,
+      title: note.title,
+      similarity: Math.round(note.similarity * 100) / 100 // Round to 2 decimal places
+    }));
+    osbaData.similarNotesUpdated = new Date().toISOString();
+
+    const updatedFrontmatter = {
+      ...frontmatter,
+      osba: osbaData
+    };
+
+    const newContent = this.buildContent(updatedFrontmatter, body);
+    await this.app.vault.modify(file, newContent);
+  }
+
+  /**
    * Parse frontmatter from content
    */
   private parseFrontmatter(content: string): { frontmatter: Record<string, any>; body: string } {
