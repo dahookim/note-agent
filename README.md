@@ -4,6 +4,19 @@
 
 ---
 
+## 👤 저자 소개 (Author)
+
+**Master of Learning (배움의 달인)**
+
+> 지식 관리와 AI의 결합을 연구합니다. 더 많은 통찰을 원하신다면 제 채널을 구독해주세요!
+
+| Channel | Link |
+|---------|------|
+| **YouTube** | [📺 배움의 달인 채널 구독하기](https://www.youtube.com/@%EB%B0%B0%EC%9B%80%EC%9D%98%EB%8B%AC%EC%9D%B8-p5v) |
+| **X (Twitter)** | [🐦 @reallygood83 팔로우하기](https://x.com/reallygood83) |
+
+---
+
 ## 이 플러그인이 뭔가요? (쉬운 설명)
 
 ### 비유 1: 도서관의 슈퍼 사서
@@ -417,6 +430,12 @@ Gemini Flash만 사용
 ## 라이선스
 
 MIT License - 자유롭게 사용, 수정, 배포 가능
+
+---
+## 📞 Connect with Me
+
+- **YouTube**: [Master of Learning (배움의 달인)](https://www.youtube.com/@%EB%B0%B0%EC%9B%80%EC%9D%98%EB%8B%AC%EC%9D%B8-p5v)
+- **X (Twitter)**: [@reallygood83](https://x.com/reallygood83)
 
 ---
 

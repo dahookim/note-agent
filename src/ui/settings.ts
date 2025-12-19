@@ -608,6 +608,34 @@ export class OSBASettingTab extends PluginSettingTab {
         cls: 'osba-error',
       });
     }
+
+    // ============================================
+    // Connect with Developer Section
+    // ============================================
+
+    containerEl.createEl('h2', { text: '❤️ Connect with Master of Learning (배움의 달인)' });
+    const connectContainer = containerEl.createDiv({ cls: 'osba-connect-container' });
+
+    // YouTube Button
+    new Setting(connectContainer)
+      .setName('YouTube')
+      .setDesc('구독하고 더 많은 지식 관리 팁을 확인하세요!')
+      .addButton(button => button
+        .setButtonText('배움의 달인 채널 방문하기')
+        .setCta()
+        .onClick(() => {
+          window.open('https://www.youtube.com/@%EB%B0%B0%EC%9B%80%EC%9D%98%EB%8B%AC%EC%9D%B8-p5v');
+        }));
+
+    // X (Twitter) Button
+    new Setting(connectContainer)
+      .setName('X (Twitter)')
+      .setDesc('최신 업데이트와 인사이트를 팔로우하세요!')
+      .addButton(button => button
+        .setButtonText('Follow @reallygood83')
+        .onClick(() => {
+          window.open('https://x.com/reallygood83');
+        }));
   }
 
   private addStatRow(table: HTMLTableElement, label: string, value: string): void {
