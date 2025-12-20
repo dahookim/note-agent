@@ -406,7 +406,7 @@ export default class OSBAPlugin extends Plugin {
       await this.database.logUsage({
         provider,
         model: result.model,
-        operation: 'generation',
+        operation: 'draft',
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
         cost: result.cost,

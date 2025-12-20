@@ -143,7 +143,7 @@ export class ConnectionAnalyzer {
     );
 
     // 사용량 로깅
-    await this.logUsage(result, 'generation', file.path);
+    await this.logUsage(result, 'analysis', file.path);
 
     // 응답 파싱
     const parsed = this.parseAnalysisResponse(result.text);
@@ -213,7 +213,7 @@ export class ConnectionAnalyzer {
     );
 
     // 사용량 로깅
-    await this.logUsage(result, 'generation');
+    await this.logUsage(result, 'draft');
 
     return {
       content: result.text,
@@ -375,7 +375,7 @@ ${this.truncateContent(note.content, 2000)}
 
   private async logUsage(
     result: GenerateResult,
-    operation: 'generation' | 'embedding',
+    operation: 'generation' | 'embedding' | 'analysis' | 'draft' | 'indexing',
     notePath?: string
   ): Promise<void> {
     // 모델명에서 provider 추출

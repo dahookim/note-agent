@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS usage_log (
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
   provider TEXT NOT NULL CHECK(provider IN ('gemini', 'claude', 'openai', 'xai')),
   model TEXT NOT NULL,
-  operation TEXT NOT NULL CHECK(operation IN ('generation', 'embedding')),
+  operation TEXT NOT NULL CHECK(operation IN ('generation', 'embedding', 'analysis', 'draft', 'indexing')),
   input_tokens INTEGER DEFAULT 0,
   output_tokens INTEGER DEFAULT 0,
   cost REAL DEFAULT 0,
@@ -220,6 +220,9 @@ export class OSBADatabase {
       // Run schema (CREATE IF NOT EXISTS is safe)
       this.db.run(SCHEMA);
 
+      // Perform migrations
+      await this.migrate();
+
       // Save initial state
       await this.save();
 
@@ -228,6 +231,64 @@ export class OSBADatabase {
     } catch (error) {
       console.error('Failed to initialize database:', error);
       throw error;
+    }
+  }
+
+  private async migrate(): Promise<void> {
+    const db = this.ensureDb();
+
+    // Check current version
+    const versionResult = db.exec('PRAGMA user_version');
+    const version = (versionResult.length > 0 && versionResult[0].values.length > 0)
+      ? versionResult[0].values[0][0] as number
+      : 0;
+
+    if (version < 1) {
+      console.log('Migrating database to version 1...');
+
+      try {
+        db.run('BEGIN TRANSACTION');
+
+        // Rename old table
+        db.run('ALTER TABLE usage_log RENAME TO usage_log_old');
+
+        // Create new table with updated CHECK constraints
+        db.run(`
+          CREATE TABLE usage_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            provider TEXT NOT NULL CHECK(provider IN ('gemini', 'claude', 'openai', 'xai')),
+            model TEXT NOT NULL,
+            operation TEXT NOT NULL CHECK(operation IN ('generation', 'embedding', 'analysis', 'draft', 'indexing')),
+            input_tokens INTEGER DEFAULT 0,
+            output_tokens INTEGER DEFAULT 0,
+            cost REAL DEFAULT 0,
+            job_id TEXT,
+            note_path TEXT
+          )
+        `);
+
+        // Create indexes
+        db.run('CREATE INDEX IF NOT EXISTS idx_usage_timestamp ON usage_log(timestamp)');
+        db.run('CREATE INDEX IF NOT EXISTS idx_usage_provider ON usage_log(provider)');
+
+        // Copy data
+        db.run('INSERT INTO usage_log SELECT * FROM usage_log_old');
+
+        // Drop old table
+        db.run('DROP TABLE usage_log_old');
+
+        // Update version
+        db.run('PRAGMA user_version = 1');
+
+        db.run('COMMIT');
+
+        console.log('Database migration to version 1 completed');
+      } catch (error) {
+        db.run('ROLLBACK');
+        console.error('Migration failed:', error);
+        throw error;
+      }
     }
   }
 

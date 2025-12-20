@@ -595,6 +595,35 @@ export class OSBASettingTab extends PluginSettingTab {
         );
         this.addStatRow(usageTable, '오늘 요청 수', `${usageDaily.requestCount}회`);
         this.addStatRow(usageTable, '이번 달 요청 수', `${usageMonthly.requestCount}회`);
+
+        // Operation Breakdown
+        statsContainer.createEl('h4', { text: '📊 작업별 비용 상세 (일간/월간)' });
+        const opTable = statsContainer.createEl('table', { cls: 'osba-stats-table' });
+
+        const operations: Record<string, string> = {
+          'embedding': '임베딩/인덱싱',
+          'analysis': '노트 분석',
+          'draft': '초안 작성',
+          'generation': '기타 생성',
+          'indexing': '인덱싱'
+        };
+
+        const allOps = Array.from(new Set([
+          ...Object.keys(usageDaily.byOperation),
+          ...Object.keys(usageMonthly.byOperation)
+        ])).sort();
+
+        if (allOps.length === 0) {
+          this.addStatRow(opTable, '데이터 없음', '-');
+        } else {
+          for (const op of allOps) {
+            const label = operations[op] || op;
+            const daily = usageDaily.byOperation[op] || 0;
+            const monthly = usageMonthly.byOperation[op] || 0;
+
+            this.addStatRow(opTable, label, `$${daily.toFixed(4)} / $${monthly.toFixed(4)}`);
+          }
+        }
       } else {
         statsContainer.createEl('p', {
           text: '사용량 통계를 불러올 수 없습니다.',

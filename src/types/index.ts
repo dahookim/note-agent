@@ -260,7 +260,7 @@ export interface UsageRecord {
   timestamp: Date;
   provider: ProviderType;
   model: string;
-  operation: 'generation' | 'embedding';
+  operation: 'generation' | 'embedding' | 'analysis' | 'draft' | 'indexing';
   inputTokens: number;
   outputTokens: number;
   cost: number;
