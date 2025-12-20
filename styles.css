@@ -1087,3 +1087,137 @@
   border-radius: 6px;
   border-left: 3px solid var(--osba-info);
 }
+
+/* ============================================
+   Main Menu (Quick Option Modal)
+   ============================================ */
+
+.osba-main-menu {
+  max-width: 600px;
+}
+
+.osba-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.osba-menu-grid-small {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.osba-menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--osba-bg-secondary);
+  border: 1px solid var(--osba-border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  position: relative;
+  overflow: hidden;
+}
+
+.osba-menu-btn:hover {
+  background: var(--osba-bg-tertiary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px var(--osba-shadow);
+  border-color: var(--osba-primary);
+}
+
+.osba-menu-btn:active {
+  transform: translateY(0);
+}
+
+/* Button Variants */
+.osba-menu-btn-cta {
+  background: linear-gradient(135deg, var(--osba-primary) 0%, var(--osba-secondary) 100%);
+  border: none;
+  color: white;
+}
+
+.osba-menu-btn-cta .osba-menu-title,
+.osba-menu-btn-cta .osba-menu-desc,
+.osba-menu-btn-cta .osba-menu-icon {
+  color: white !important;
+}
+
+.osba-menu-btn-cta:hover {
+  box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3);
+}
+
+.osba-menu-btn-primary {
+  border-left: 4px solid var(--osba-primary);
+}
+
+.osba-menu-btn-secondary {
+  padding: 12px;
+}
+
+.osba-menu-btn-secondary .osba-menu-icon {
+  font-size: 1.2em;
+}
+
+.osba-menu-btn-secondary .osba-menu-title {
+  font-size: 0.95em;
+}
+
+/* Button Content */
+.osba-menu-icon {
+  font-size: 1.5em;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: rgba(128, 128, 128, 0.1);
+  border-radius: 8px;
+}
+
+.osba-menu-btn-cta .osba-menu-icon {
+    background: rgba(255,255,255,0.2);
+}
+
+.osba-menu-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.osba-menu-title {
+  font-weight: 600;
+  color: var(--osba-text-primary);
+  font-size: 1.05em;
+  margin-bottom: 4px;
+}
+
+.osba-menu-desc {
+  font-size: 0.85em;
+  color: var(--osba-text-secondary);
+  line-height: 1.4;
+}
+
+/* Divider */
+.osba-divider {
+  border: 0;
+  height: 1px;
+  background: var(--osba-border);
+  margin: 24px 0 16px;
+}
+
+.osba-section-label {
+  display: block;
+  font-size: 0.8em;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--osba-text-muted);
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
