@@ -6,7 +6,8 @@ import { AIProviderManager } from './api/provider';
 import { EmbeddingService } from './core/embeddings';
 import { ConnectionAnalyzer } from './core/analyzer';
 import { FrontmatterManager } from './core/frontmatter';
-import { QuickDraftModal } from './ui/modals';
+import { QuickDraftModal, OSBAMainMenuModal } from './ui/modals';
+import { ProgressModal } from './ui/progress-modal';
 import {
   JobQueueView,
   JOB_QUEUE_VIEW_TYPE,
@@ -68,8 +69,8 @@ export default class OSBAPlugin extends Plugin {
     this.addSettingTab(new OSBASettingTab(this.app, this));
 
     // Add ribbon icon
-    this.addRibbonIcon('brain-circuit', 'OSBA: Quick Draft', () => {
-      new QuickDraftModal(this.app, this).open();
+    this.addRibbonIcon('brain-circuit', 'OSBA: Quick Actions', () => {
+      new OSBAMainMenuModal(this.app, this).open();
     });
 
     console.log('OSBA Plugin loaded successfully');
@@ -202,6 +203,15 @@ export default class OSBAPlugin extends Plugin {
   // ============================================
 
   private registerCommands(): void {
+    // Open OSBA Main Menu
+    this.addCommand({
+      id: 'open-main-menu',
+      name: 'Open Main Menu - Quick Actions',
+      callback: () => {
+        new OSBAMainMenuModal(this.app, this).open();
+      },
+    });
+
     // Quick Draft command
     this.addCommand({
       id: 'quick-draft',
@@ -470,6 +480,9 @@ Generate the markdown content for the note:`;
 
   async analyzeNote(file: TFile): Promise<void> {
     const job = this.createJob('analyze', { path: file.path });
+    const modal = new ProgressModal(this.app, '노트 분석');
+    modal.open();
+    modal.updateState({ message: '분석 준비 중...' });
 
     try {
       this.updateJobStatus(job.id, 'running');
@@ -477,10 +490,22 @@ Generate the markdown content for the note:`;
       if (this.isExcluded(file)) {
         new Notice('Note is excluded from analysis');
         this.updateJobStatus(job.id, 'cancelled');
+        modal.updateState({ status: 'cancelled', message: '이 노트는 분석에서 제외되었습니다.' });
+        setTimeout(() => modal.close(), 1500);
         return;
       }
 
+      modal.updateProgress(30, '관련 노트 찾는 중...');
+
+      // Actual analysis logic here logic is inside connectionAnalyzer.analyzeNote
+      // But since analyzeNote is atomic in the current implementation, we can just await it
+      // For better progress updates, we'd need to modify connectionAnalyzer to accept a progress callback
+      // For now, we simulate progress steps 
+
+      modal.updateProgress(50, 'AI 분석 실행 중...');
       const result = await this.connectionAnalyzer.analyzeNote(file);
+
+      modal.updateProgress(80, '결과 저장 중...');
 
       // Update note frontmatter
       await this.updateNoteFrontmatter(file, result);
@@ -489,10 +514,15 @@ Generate the markdown content for the note:`;
       await this.addInsightsSection(file, result);
 
       this.updateJobStatus(job.id, 'completed', result);
+
+      modal.complete(`✅ ${result.connections.length}개의 연결 발견!`);
+      setTimeout(() => modal.close(), 1500);
+
       new Notice(`Analysis complete: Found ${result.connections.length} connections`);
 
     } catch (error) {
       this.updateJobStatus(job.id, 'failed', undefined, error as Error);
+      modal.setError(error instanceof Error ? error.message : 'Analysis failed');
       new Notice('Analysis failed. Check console for details.');
     }
   }
@@ -528,6 +558,9 @@ Generate the markdown content for the note:`;
 
   async batchIndexVault(): Promise<void> {
     const job = this.createJob('batch-embed', {});
+    const modal = new ProgressModal(this.app, '전체 인덱싱');
+    modal.open();
+    modal.updateState({ message: '인덱싱 준비 중...', progress: 0 });
 
     try {
       this.updateJobStatus(job.id, 'running');
@@ -538,17 +571,36 @@ Generate the markdown content for the note:`;
       let processed = 0;
       const total = files.length;
 
+      modal.updateState({
+        message: `총 ${total}개 노트 인덱싱 시작`,
+        subMessage: '잠시만 기다려주세요...'
+      });
+
       for (const file of files) {
+        // Update progress modal
+        modal.updateProgress(
+          (processed / total) * 100,
+          `${processed}/${total} 처리 중`
+        );
+        modal.updateState({ subMessage: file.basename });
+
+        // Generate embedding
         await this.generateEmbedding(file);
+
         processed++;
         this.updateJobProgress(job.id, Math.round((processed / total) * 100));
       }
 
       this.updateJobStatus(job.id, 'completed', { processed });
+      modal.complete(`✅ ${processed}개 노트 인덱싱 완료!`);
+
+      // Close modal after 2 seconds
+      setTimeout(() => modal.close(), 2000);
       new Notice(`Indexed ${processed} notes`);
 
     } catch (error) {
       this.updateJobStatus(job.id, 'failed', undefined, error as Error);
+      modal.setError(error instanceof Error ? error.message : 'Batch indexing failed');
       new Notice('Batch indexing failed');
     }
   }
