@@ -311,7 +311,8 @@ export default class OSBAPlugin extends Plugin {
           }
           if (this.settings.autoAnalyzeOnCreate) {
             // Delay analysis to allow content to be written
-            setTimeout(() => this.analyzeNote(file), 2000);
+            // Pass false to suppress notifications for auto-triggered analysis
+            setTimeout(() => this.analyzeNote(file, false), 2000);
           }
         }
       })
@@ -478,7 +479,16 @@ Generate the markdown content for the note:`;
     }
   }
 
-  async analyzeNote(file: TFile): Promise<void> {
+  async analyzeNote(file: TFile, showFeedback: boolean = true): Promise<void> {
+    // Check exclusion BEFORE opening modal to prevent unnecessary UI
+    if (this.isExcluded(file)) {
+      if (showFeedback) {
+        new Notice('이 노트는 분석에서 제외되었습니다.');
+      }
+      console.log(`Note excluded from analysis: ${file.path}`);
+      return;
+    }
+
     const job = this.createJob('analyze', { path: file.path });
     const modal = new ProgressModal(this.app, '노트 분석');
     modal.open();
@@ -486,14 +496,6 @@ Generate the markdown content for the note:`;
 
     try {
       this.updateJobStatus(job.id, 'running');
-
-      if (this.isExcluded(file)) {
-        new Notice('Note is excluded from analysis');
-        this.updateJobStatus(job.id, 'cancelled');
-        modal.updateState({ status: 'cancelled', message: '이 노트는 분석에서 제외되었습니다.' });
-        setTimeout(() => modal.close(), 1500);
-        return;
-      }
 
       modal.updateProgress(30, '관련 노트 찾는 중...');
 
