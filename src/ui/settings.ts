@@ -100,30 +100,34 @@ export class OSBASettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Quick Draft 모델')
-      .setDesc('빠른 초안 작성에 사용할 모델 (속도 우선)')
+      .setDesc('빠른 초안 작성에 사용할 모델 (속도 우선) - 2025년 12월 기준')
       .addDropdown(dropdown => dropdown
-        .addOption('gemini-flash', 'Gemini 2.0 Flash ($0.075/1M)')
+        .addOption('gemini-2.5-flash-lite', 'Gemini 2.5 Flash-Lite ($0.10/1M, 가장 저렴)')
         .addOption('gemini-2.5-flash', 'Gemini 2.5 Flash ($0.15/1M, 1M 컨텍스트)')
-        .addOption('gemini-pro', 'Gemini 1.5 Pro ($1.25/1M)')
-        .addOption('claude-sonnet', 'Claude 3.5 Sonnet ($3.00/1M)')
+        .addOption('gpt-4.1-nano', 'GPT-4.1 nano (가장 빠름, 1M 컨텍스트)')
+        .addOption('gpt-4.1-mini', 'GPT-4.1 mini ($0.40/1M, 1M 컨텍스트)')
+        .addOption('claude-sonnet-4', 'Claude Sonnet 4 ($3.00/1M)')
         .addOption('grok-4-fast', 'Grok 4.1 Fast ($2.00/1M, 128K 컨텍스트)')
         .setValue(this.plugin.settings.quickDraftModel)
         .onChange(async (value) => {
-          this.plugin.settings.quickDraftModel = value as 'gemini-flash' | 'gemini-2.5-flash' | 'gemini-pro' | 'claude-sonnet' | 'grok-4-fast';
+          this.plugin.settings.quickDraftModel = value as 'gemini-2.5-flash-lite' | 'gemini-2.5-flash' | 'gpt-4.1-nano' | 'gpt-4.1-mini' | 'claude-sonnet-4' | 'grok-4-fast';
           await this.plugin.saveSettings();
         }));
 
     new Setting(containerEl)
       .setName('분석 모델')
-      .setDesc('노트 분석 및 연결 탐색에 사용할 모델 (품질 우선)')
+      .setDesc('노트 분석 및 연결 탐색에 사용할 모델 (품질 우선) - 2025년 12월 기준')
       .addDropdown(dropdown => dropdown
-        .addOption('claude-sonnet', 'Claude 3.5 Sonnet ($3.00/1M)')
-        .addOption('claude-opus', 'Claude 3 Opus ($15.00/1M)')
-        .addOption('gemini-pro', 'Gemini 1.5 Pro ($1.25/1M)')
+        .addOption('claude-sonnet-4', 'Claude Sonnet 4 ($3.00/1M)')
+        .addOption('claude-opus-4', 'Claude Opus 4 ($15.00/1M)')
+        .addOption('claude-opus-4.5', 'Claude Opus 4.5 ($5.00/1M, 최신)')
+        .addOption('gemini-2.5-pro', 'Gemini 2.5 Pro ($1.25/1M, 1M 컨텍스트)')
+        .addOption('gpt-4.1', 'GPT-4.1 ($2.00/1M, 1M 컨텍스트)')
+        .addOption('gpt-4o', 'GPT-4o ($2.50/1M)')
         .addOption('grok-4-fast', 'Grok 4.1 Fast ($2.00/1M, 128K 컨텍스트)')
         .setValue(this.plugin.settings.analysisModel)
         .onChange(async (value) => {
-          this.plugin.settings.analysisModel = value as 'claude-sonnet' | 'claude-opus' | 'gemini-pro' | 'grok-4-fast';
+          this.plugin.settings.analysisModel = value as 'claude-sonnet-4' | 'claude-opus-4' | 'claude-opus-4.5' | 'gemini-2.5-pro' | 'gpt-4.1' | 'gpt-4o' | 'grok-4-fast';
           await this.plugin.saveSettings();
         }));
 

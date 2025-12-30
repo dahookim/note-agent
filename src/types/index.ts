@@ -14,9 +14,22 @@ export interface OSBASettings {
   openaiApiKey: string;
   xaiApiKey: string;  // xAI Grok API key
 
-  // Model Selection
-  quickDraftModel: 'gemini-flash' | 'gemini-2.5-flash' | 'gemini-pro' | 'claude-sonnet' | 'grok-4-fast';
-  analysisModel: 'claude-sonnet' | 'claude-opus' | 'gemini-pro' | 'grok-4-fast';
+  // Model Selection (2025년 12월 기준 최신 모델)
+  quickDraftModel:
+    | 'gemini-2.5-flash-lite'  // Gemini 2.5 Flash-Lite (가장 빠르고 저렴)
+    | 'gemini-2.5-flash'       // Gemini 2.5 Flash
+    | 'gpt-4.1-nano'           // GPT-4.1 nano (가장 빠름, 1M 컨텍스트)
+    | 'gpt-4.1-mini'           // GPT-4.1 mini (1M 컨텍스트)
+    | 'claude-sonnet-4'        // Claude Sonnet 4
+    | 'grok-4-fast';           // Grok 4.1 Fast (128K 컨텍스트)
+  analysisModel:
+    | 'claude-sonnet-4'        // Claude Sonnet 4
+    | 'claude-opus-4'          // Claude Opus 4
+    | 'claude-opus-4.5'        // Claude Opus 4.5 (최신)
+    | 'gemini-2.5-pro'         // Gemini 2.5 Pro (1M 컨텍스트)
+    | 'gpt-4.1'                // GPT-4.1 (1M 컨텍스트)
+    | 'gpt-4o'                 // GPT-4o
+    | 'grok-4-fast';           // Grok 4.1 Fast (128K 컨텍스트)
   embeddingModel: 'openai-small' | 'openai-large';
 
   // Custom Model Names (for manual override)
@@ -55,8 +68,8 @@ export const DEFAULT_SETTINGS: OSBASettings = {
   openaiApiKey: '',
   xaiApiKey: '',
 
-  quickDraftModel: 'gemini-flash',
-  analysisModel: 'claude-sonnet',
+  quickDraftModel: 'gemini-2.5-flash',
+  analysisModel: 'claude-sonnet-4',
   embeddingModel: 'openai-small',
 
   useCustomModels: false,
