@@ -34,12 +34,20 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     maxOutputTokens: 8192,
   },
   'gemini-2.5-flash': {
-    id: 'gemini-2.5-flash-preview-05-20',
+    id: 'gemini-2.5-flash',  // Fixed: was gemini-2.5-flash-preview-05-20
     provider: 'gemini',
     inputCostPer1M: 0.15,
     outputCostPer1M: 0.60,
     maxInputTokens: 1048576,  // 1M tokens
     maxOutputTokens: 65536,    // 64K output tokens
+  },
+  'gemini-2.5-flash-lite': {
+    id: 'gemini-2.0-flash-lite',  // Fixed: was gemini-2.5-flash-8b-exp-0924
+    provider: 'gemini',
+    inputCostPer1M: 0.075,
+    outputCostPer1M: 0.30,
+    maxInputTokens: 1048576,
+    maxOutputTokens: 8192,
   },
   'gemini-pro': {
     id: 'gemini-1.5-pro',
@@ -48,6 +56,14 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     outputCostPer1M: 5.00,
     maxInputTokens: 2000000,
     maxOutputTokens: 8192,
+  },
+  'gemini-2.5-pro': {
+    id: 'gemini-2.5-pro',  // Added: New Gemini 2.5 Pro model
+    provider: 'gemini',
+    inputCostPer1M: 1.25,
+    outputCostPer1M: 5.00,
+    maxInputTokens: 1048576,  // 1M tokens
+    maxOutputTokens: 65536,
   },
 
   // Claude Models
@@ -67,6 +83,30 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     maxInputTokens: 200000,
     maxOutputTokens: 4096,
   },
+  'claude-sonnet-4': {
+    id: 'claude-sonnet-4-20250514',  // Added: Claude Sonnet 4
+    provider: 'claude',
+    inputCostPer1M: 3.00,
+    outputCostPer1M: 15.00,
+    maxInputTokens: 200000,
+    maxOutputTokens: 16384,
+  },
+  'claude-opus-4': {
+    id: 'claude-opus-4-20250514',  // Added: Claude Opus 4
+    provider: 'claude',
+    inputCostPer1M: 15.00,
+    outputCostPer1M: 75.00,
+    maxInputTokens: 200000,
+    maxOutputTokens: 16384,
+  },
+  'claude-opus-4.5': {
+    id: 'claude-opus-4-5-20251028',  // Added: Claude Opus 4.5
+    provider: 'claude',
+    inputCostPer1M: 15.00,
+    outputCostPer1M: 75.00,
+    maxInputTokens: 200000,
+    maxOutputTokens: 16384,
+  },
 
   // xAI Grok Models
   'grok-4-fast': {
@@ -76,6 +116,40 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     outputCostPer1M: 10.00,
     maxInputTokens: 131072,    // 128K context window
     maxOutputTokens: 131072,   // Large output support
+  },
+
+  // OpenAI Text Generation Models (Added)
+  'gpt-4.1': {
+    id: 'gpt-4.1',
+    provider: 'openai',
+    inputCostPer1M: 2.00,
+    outputCostPer1M: 8.00,
+    maxInputTokens: 1047576,
+    maxOutputTokens: 32768,
+  },
+  'gpt-4.1-mini': {
+    id: 'gpt-4.1-mini',
+    provider: 'openai',
+    inputCostPer1M: 0.40,
+    outputCostPer1M: 1.60,
+    maxInputTokens: 1047576,
+    maxOutputTokens: 32768,
+  },
+  'gpt-4.1-nano': {
+    id: 'gpt-4.1-nano',
+    provider: 'openai',
+    inputCostPer1M: 0.10,
+    outputCostPer1M: 0.40,
+    maxInputTokens: 1047576,
+    maxOutputTokens: 32768,
+  },
+  'gpt-4o': {
+    id: 'gpt-4o',
+    provider: 'openai',
+    inputCostPer1M: 2.50,
+    outputCostPer1M: 10.00,
+    maxInputTokens: 128000,
+    maxOutputTokens: 16384,
   },
 
   // OpenAI Embedding Models
@@ -148,6 +222,8 @@ export class AIProviderManager {
         return this.generateWithClaude(config, prompt, options);
       case 'xai':
         return this.generateWithXAI(config, prompt, options);
+      case 'openai':
+        return this.generateTextWithOpenAI(config, prompt, options);
       default:
         throw new APIError(`Provider ${config.provider} does not support text generation`, config.provider, 400);
     }
@@ -364,6 +440,76 @@ export class AIProviderManager {
 
     if (!data.choices || data.choices.length === 0) {
       throw new APIError('No response from xAI', 'xai', 500);
+    }
+
+    const choice = data.choices[0];
+    const text = choice.message?.content || '';
+
+    const inputTokens = data.usage?.prompt_tokens || this.estimateTokens(prompt);
+    const outputTokens = data.usage?.completion_tokens || this.estimateTokens(text);
+
+    return {
+      text,
+      inputTokens,
+      outputTokens,
+      cost: this.calculateCost(config, inputTokens, outputTokens),
+      model: config.id,
+      finishReason: choice.finish_reason === 'stop' ? 'stop' : 'length',
+    };
+  }
+
+  private async generateTextWithOpenAI(
+    config: ModelConfig,
+    prompt: string,
+    options: GenerateOptions
+  ): Promise<GenerateResult> {
+    const apiKey = this.settings.openaiApiKey;
+    if (!apiKey) {
+      throw new APIError('OpenAI API key not configured', 'openai', 401);
+    }
+
+    const url = `${API_ENDPOINTS.openai}/chat/completions`;
+
+    const messages: Array<{ role: string; content: string }> = [];
+
+    if (options.systemPrompt) {
+      messages.push({ role: 'system', content: options.systemPrompt });
+    }
+
+    messages.push({ role: 'user', content: prompt });
+
+    const body: Record<string, unknown> = {
+      model: config.id,
+      messages,
+      max_tokens: options.maxTokens || config.maxOutputTokens,
+    };
+
+    if (options.temperature !== undefined) {
+      body.temperature = options.temperature;
+    }
+
+    if (options.topP !== undefined) {
+      body.top_p = options.topP;
+    }
+
+    if (options.stopSequences && options.stopSequences.length > 0) {
+      body.stop = options.stopSequences;
+    }
+
+    const response = await this.makeRequest({
+      url,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+    }, 'openai');
+
+    const data = JSON.parse(response);
+
+    if (!data.choices || data.choices.length === 0) {
+      throw new APIError('No response from OpenAI', 'openai', 500);
     }
 
     const choice = data.choices[0];

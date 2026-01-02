@@ -43,6 +43,9 @@ export default class OSBAPlugin extends Plugin {
   private jobQueue: Map<string, Job> = new Map();
   private isProcessingQueue: boolean = false;
 
+  // Prevent auto-analysis on Obsidian startup
+  private pluginReady: boolean = false;
+
   constructor(app: App, manifest: PluginManifest) {
     super(app, manifest);
   }
@@ -72,6 +75,12 @@ export default class OSBAPlugin extends Plugin {
     this.addRibbonIcon('brain-circuit', 'OSBA: Quick Actions', () => {
       new OSBAMainMenuModal(this.app, this).open();
     });
+
+    // Delay plugin ready flag to prevent auto-analysis on startup
+    // The 'create' event fires for existing notes during Obsidian startup
+    setTimeout(() => {
+      this.pluginReady = true;
+    }, 5000);
 
     console.log('OSBA Plugin loaded successfully');
     new Notice('Second Brain Agent loaded');
@@ -305,6 +314,11 @@ export default class OSBAPlugin extends Plugin {
     // Handle file creation
     this.registerEvent(
       this.app.vault.on('create', async (file) => {
+        // Ignore events during Obsidian startup to prevent auto-analysis of existing notes
+        if (!this.pluginReady) {
+          return;
+        }
+
         if (file instanceof TFile && file.extension === 'md') {
           if (this.settings.autoEmbedOnModify) {
             await this.generateEmbedding(file);

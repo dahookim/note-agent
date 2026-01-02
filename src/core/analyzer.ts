@@ -137,7 +137,7 @@ export class ConnectionAnalyzer {
       prompt,
       {
         systemPrompt: ANALYSIS_SYSTEM_PROMPT,
-        maxTokens: 2000,
+        maxTokens: 8000,  // Fixed: was 2000, increased to prevent response truncation
         temperature: 0.3, // 더 일관된 응답을 위해 낮은 temperature
       }
     );
@@ -289,13 +289,32 @@ ${this.truncateContent(note.content, 2000)}
     insights: string;
   } {
     try {
+      // Check for empty response
+      if (!response || response.trim().length === 0) {
+        throw new Error('Empty response from API');
+      }
+
+      // Remove code block markers (```json ... ``` or ``` ... ```)
+      let cleanedResponse = response
+        .replace(/```json\s*/gi, '')
+        .replace(/```\s*/g, '')
+        .trim();
+
       // JSON 블록 추출
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error('No JSON found in response');
       }
 
-      const parsed = JSON.parse(jsonMatch[0]);
+      let jsonString = jsonMatch[0];
+
+      // Fix trailing commas (common LLM error)
+      // Replace ", }" with " }" and ", ]" with " ]"
+      jsonString = jsonString
+        .replace(/,\s*}/g, ' }')
+        .replace(/,\s*]/g, ' ]');
+
+      const parsed = JSON.parse(jsonString);
 
       return {
         connections: (parsed.connections || []).map((c: any) => ({
@@ -314,6 +333,7 @@ ${this.truncateContent(note.content, 2000)}
       };
     } catch (error) {
       console.error('Failed to parse analysis response:', error);
+      console.error('Raw response:', response.slice(0, 500));
       return {
         connections: [],
         gaps: [],
