@@ -628,6 +628,7 @@ Generate the markdown content for the note:`;
   public isExcluded(file: TFile): boolean {
     // Check file size first (applies to both modes)
     if (file.stat.size > this.settings.maxNoteSize) {
+      console.log(`[OSBA] Note excluded - File size (${(file.stat.size / 1024).toFixed(1)}KB) exceeds maxNoteSize (${(this.settings.maxNoteSize / 1024).toFixed(1)}KB): ${file.path}`);
       return true;
     }
 
@@ -636,6 +637,7 @@ Generate the markdown content for the note:`;
       // Include mode: only index files in includedFolders
       if (this.settings.includedFolders.length === 0) {
         // No folders specified, include nothing (exclude all)
+        console.log(`[OSBA] Note excluded - Include mode active but no folders specified: ${file.path}`);
         return true;
       }
 
@@ -646,12 +648,14 @@ Generate the markdown content for the note:`;
 
       // If not in included folders, exclude it
       if (!isIncluded) {
+        console.log(`[OSBA] Note excluded - Not in includedFolders [${this.settings.includedFolders.join(', ')}]: ${file.path}`);
         return true;
       }
     } else {
       // Exclude mode (default): exclude files in excludedFolders
       for (const folder of this.settings.excludedFolders) {
         if (file.path.startsWith(folder + '/')) {
+          console.log(`[OSBA] Note excluded - In excludedFolders [${folder}]: ${file.path}`);
           return true;
         }
       }

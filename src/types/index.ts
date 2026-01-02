@@ -85,7 +85,7 @@ export const DEFAULT_SETTINGS: OSBASettings = {
   excludedFolders: ['templates', '.obsidian'],
   includedFolders: [],  // 포함 모드일 때 사용
   excludedTags: ['private', 'draft'],
-  maxNoteSize: 50 * 1024,  // 50KB
+  maxNoteSize: 200 * 1024,  // 200KB (increased from 50KB)
   batchSize: 10,
 
   autoAnalyzeOnCreate: false,  // Default OFF to prevent unexpected API costs
