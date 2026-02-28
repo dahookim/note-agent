@@ -1,11 +1,11 @@
 {
-  "id": "obsidian-second-brain-agent",
-  "name": "Second Brain Agent",
-  "version": "0.2.15",
+  "id": "note-agent",
+  "name": "Note Agent",
+  "version": "0.1.0",
   "minAppVersion": "1.4.0",
-  "description": "AI-powered Second Brain automation - auto-discover connections, analyze knowledge gaps, and enhance your notes with intelligent insights",
+  "description": "AI-powered Note automation - auto-discover connections, analyze knowledge gaps, and enhance your notes with intelligent insights",
   "author": "OSBA Team",
-  "authorUrl": "https://github.com/reallygood83/obsidian-ai-agent",
+  "authorUrl": "https://github.com/reallygood83/note-agent",
   "fundingUrl": "",
   "isDesktopOnly": true
 }

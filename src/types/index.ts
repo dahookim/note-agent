@@ -1,6 +1,6 @@
 /**
  * OSBA Type Definitions
- * Obsidian Second Brain Agent
+ * Note Agent
  */
 
 // ============================================
@@ -14,23 +14,13 @@ export interface OSBASettings {
   openaiApiKey: string;
   xaiApiKey: string;  // xAI Grok API key
 
-  // Model Selection (2025년 12월 기준 최신 모델)
-  quickDraftModel:
-    | 'gemini-2.5-flash-lite'  // Gemini 2.5 Flash-Lite (가장 빠르고 저렴)
-    | 'gemini-2.5-flash'       // Gemini 2.5 Flash
-    | 'gpt-4.1-nano'           // GPT-4.1 nano (가장 빠름, 1M 컨텍스트)
-    | 'gpt-4.1-mini'           // GPT-4.1 mini (1M 컨텍스트)
-    | 'claude-sonnet-4'        // Claude Sonnet 4
-    | 'grok-4-fast';           // Grok 4.1 Fast (128K 컨텍스트)
-  analysisModel:
-    | 'claude-sonnet-4'        // Claude Sonnet 4
-    | 'claude-opus-4'          // Claude Opus 4
-    | 'claude-opus-4.5'        // Claude Opus 4.5 (최신)
-    | 'gemini-2.5-pro'         // Gemini 2.5 Pro (1M 컨텍스트)
-    | 'gpt-4.1'                // GPT-4.1 (1M 컨텍스트)
-    | 'gpt-4o'                 // GPT-4o
-    | 'grok-4-fast';           // Grok 4.1 Fast (128K 컨텍스트)
-  embeddingModel: 'openai-small' | 'openai-large';
+  // Mode Selection
+  quickDraftModel: string;
+  analysisModel: string;
+  embeddingModel: string;
+
+  // Custom API Models (OpenAI Compatible)
+  customApiModels: CustomAPIModel[];
 
   // Custom Model Names (for manual override)
   useCustomModels: boolean;
@@ -71,6 +61,8 @@ export const DEFAULT_SETTINGS: OSBASettings = {
   quickDraftModel: 'gemini-2.5-flash',
   analysisModel: 'claude-sonnet-4',
   embeddingModel: 'openai-small',
+
+  customApiModels: [],
 
   useCustomModels: false,
   customQuickDraftModel: '',
@@ -138,7 +130,16 @@ export interface AIProvider {
   testConnection(): Promise<{ success: boolean; error?: string }>;
 }
 
-export type ProviderType = 'gemini' | 'claude' | 'openai' | 'xai';
+export type ProviderType = 'gemini' | 'claude' | 'openai' | 'xai' | 'custom';
+
+export interface CustomAPIModel {
+  id: string;          // Internal unique ID
+  name: string;        // Display name in settings
+  modelId: string;     // The actual model ID expected by the API (e.g., "llama3" or "anthropic/claude-3-haiku")
+  baseUrl: string;     // The endpoint URL (e.g., "http://localhost:1234/v1" or "https://openrouter.ai/api/v1")
+  apiKey: string;      // API key
+  type: 'generation' | 'embedding' | 'both';
+}
 
 // ============================================
 // Note & Analysis Types

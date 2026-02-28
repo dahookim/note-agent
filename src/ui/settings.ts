@@ -5,7 +5,7 @@
 
 import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import type OSBAPlugin from '../main';
-import { OSBASettings, DEFAULT_SETTINGS, ProviderType } from '../types';
+import { OSBASettings, DEFAULT_SETTINGS, ProviderType, CustomAPIModel } from '../types';
 import { ProgressModal } from './progress-modal';
 
 export class OSBASettingTab extends PluginSettingTab {
@@ -20,7 +20,7 @@ export class OSBASettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl('h1', { text: 'Second Brain Agent 설정' });
+    containerEl.createEl('h1', { text: 'Note Agent 설정' });
 
     // ============================================
     // API Keys Section
@@ -98,50 +98,74 @@ export class OSBASettingTab extends PluginSettingTab {
 
     containerEl.createEl('h2', { text: '🤖 모델 선택' });
 
-    new Setting(containerEl)
+    const quickDraftSetting = new Setting(containerEl)
       .setName('Quick Draft 모델')
       .setDesc('빠른 초안 작성에 사용할 모델 (속도 우선) - 2025년 12월 기준')
-      .addDropdown(dropdown => dropdown
-        .addOption('gemini-2.5-flash-lite', 'Gemini 2.5 Flash-Lite ($0.10/1M, 가장 저렴)')
-        .addOption('gemini-2.5-flash', 'Gemini 2.5 Flash ($0.15/1M, 1M 컨텍스트)')
-        .addOption('gpt-4.1-nano', 'GPT-4.1 nano (가장 빠름, 1M 컨텍스트)')
-        .addOption('gpt-4.1-mini', 'GPT-4.1 mini ($0.40/1M, 1M 컨텍스트)')
-        .addOption('claude-sonnet-4', 'Claude Sonnet 4 ($3.00/1M)')
-        .addOption('grok-4-fast', 'Grok 4.1 Fast ($2.00/1M, 128K 컨텍스트)')
-        .setValue(this.plugin.settings.quickDraftModel)
-        .onChange(async (value) => {
-          this.plugin.settings.quickDraftModel = value as 'gemini-2.5-flash-lite' | 'gemini-2.5-flash' | 'gpt-4.1-nano' | 'gpt-4.1-mini' | 'claude-sonnet-4' | 'grok-4-fast';
-          await this.plugin.saveSettings();
-        }));
+      .addDropdown(dropdown => {
+        dropdown
+          .addOption('gemini-2.5-flash-lite', 'Gemini 2.5 Flash-Lite ($0.10/1M, 가장 저렴)')
+          .addOption('gemini-2.5-flash', 'Gemini 2.5 Flash ($0.15/1M, 1M 컨텍스트)')
+          .addOption('gpt-4.1-nano', 'GPT-4.1 nano (가장 빠름, 1M 컨텍스트)')
+          .addOption('gpt-4.1-mini', 'GPT-4.1 mini ($0.40/1M, 1M 컨텍스트)')
+          .addOption('claude-sonnet-4', 'Claude Sonnet 4 ($3.00/1M)')
+          .addOption('grok-4-fast', 'Grok 4.1 Fast ($2.00/1M, 128K 컨텍스트)');
+
+        // Add Custom API Models
+        this.plugin.settings.customApiModels?.filter(m => m.type === 'generation' || m.type === 'both').forEach(model => {
+          dropdown.addOption(model.id, `[Custom] ${model.name}`);
+        });
+
+        dropdown.setValue(this.plugin.settings.quickDraftModel)
+          .onChange(async (value) => {
+            this.plugin.settings.quickDraftModel = value;
+            await this.plugin.saveSettings();
+          });
+      });
 
     new Setting(containerEl)
       .setName('분석 모델')
       .setDesc('노트 분석 및 연결 탐색에 사용할 모델 (품질 우선) - 2025년 12월 기준')
-      .addDropdown(dropdown => dropdown
-        .addOption('claude-sonnet-4', 'Claude Sonnet 4 ($3.00/1M)')
-        .addOption('claude-opus-4', 'Claude Opus 4 ($15.00/1M)')
-        .addOption('claude-opus-4.5', 'Claude Opus 4.5 ($5.00/1M, 최신)')
-        .addOption('gemini-2.5-pro', 'Gemini 2.5 Pro ($1.25/1M, 1M 컨텍스트)')
-        .addOption('gpt-4.1', 'GPT-4.1 ($2.00/1M, 1M 컨텍스트)')
-        .addOption('gpt-4o', 'GPT-4o ($2.50/1M)')
-        .addOption('grok-4-fast', 'Grok 4.1 Fast ($2.00/1M, 128K 컨텍스트)')
-        .setValue(this.plugin.settings.analysisModel)
-        .onChange(async (value) => {
-          this.plugin.settings.analysisModel = value as 'claude-sonnet-4' | 'claude-opus-4' | 'claude-opus-4.5' | 'gemini-2.5-pro' | 'gpt-4.1' | 'gpt-4o' | 'grok-4-fast';
-          await this.plugin.saveSettings();
-        }));
+      .addDropdown(dropdown => {
+        dropdown
+          .addOption('claude-sonnet-4', 'Claude Sonnet 4 ($3.00/1M)')
+          .addOption('claude-opus-4', 'Claude Opus 4 ($15.00/1M)')
+          .addOption('claude-opus-4.5', 'Claude Opus 4.5 ($5.00/1M, 최신)')
+          .addOption('gemini-2.5-pro', 'Gemini 2.5 Pro ($1.25/1M, 1M 컨텍스트)')
+          .addOption('gpt-4.1', 'GPT-4.1 ($2.00/1M, 1M 컨텍스트)')
+          .addOption('gpt-4o', 'GPT-4o ($2.50/1M)')
+          .addOption('grok-4-fast', 'Grok 4.1 Fast ($2.00/1M, 128K 컨텍스트)');
+
+        // Add Custom API Models
+        this.plugin.settings.customApiModels?.filter(m => m.type === 'generation' || m.type === 'both').forEach(model => {
+          dropdown.addOption(model.id, `[Custom] ${model.name}`);
+        });
+
+        dropdown.setValue(this.plugin.settings.analysisModel)
+          .onChange(async (value) => {
+            this.plugin.settings.analysisModel = value;
+            await this.plugin.saveSettings();
+          });
+      });
 
     new Setting(containerEl)
       .setName('임베딩 모델')
       .setDesc('벡터 임베딩 생성에 사용할 모델')
-      .addDropdown(dropdown => dropdown
-        .addOption('openai-small', 'text-embedding-3-small ($0.02/1M)')
-        .addOption('openai-large', 'text-embedding-3-large ($0.13/1M)')
-        .setValue(this.plugin.settings.embeddingModel)
-        .onChange(async (value) => {
-          this.plugin.settings.embeddingModel = value as 'openai-small' | 'openai-large';
-          await this.plugin.saveSettings();
-        }));
+      .addDropdown(dropdown => {
+        dropdown
+          .addOption('openai-small', 'text-embedding-3-small ($0.02/1M)')
+          .addOption('openai-large', 'text-embedding-3-large ($0.13/1M)');
+
+        // Add Custom API Models
+        this.plugin.settings.customApiModels?.filter(m => m.type === 'embedding' || m.type === 'both').forEach(model => {
+          dropdown.addOption(model.id, `[Custom] ${model.name}`);
+        });
+
+        dropdown.setValue(this.plugin.settings.embeddingModel)
+          .onChange(async (value) => {
+            this.plugin.settings.embeddingModel = value;
+            await this.plugin.saveSettings();
+          });
+      });
 
     // ============================================
     // Custom Model Settings Section
@@ -187,6 +211,119 @@ export class OSBASettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           }));
     }
+
+    // ============================================
+    // Custom API Models Section
+    // ============================================
+
+    containerEl.createEl('h2', { text: '🖥️ 커스텀 API 모델 설정 (OpenRouter, Ollama 등)' });
+    containerEl.createEl('p', {
+      text: 'OpenRouter, Together AI, Groq뿐만 아니라 LM Studio나 Ollama 등 OpenAI API 포맷과 호환되는 모든 엔드포인트를 추가할 수 있습니다.',
+      cls: 'setting-item-description'
+    });
+
+    new Setting(containerEl)
+      .setName('새 커스텀 모델 추가하기')
+      .setDesc('새로운 OpenAI 호환 API 서버 정보를 추가합니다.')
+      .addButton(button => button
+        .setButtonText('+ 추가')
+        .setCta()
+        .onClick(async () => {
+          if (!this.plugin.settings.customApiModels) {
+            this.plugin.settings.customApiModels = [];
+          }
+          this.plugin.settings.customApiModels.push({
+            id: `custom-${Date.now()}`,
+            name: 'New Custom Model',
+            modelId: 'openai/gpt-4o',
+            baseUrl: 'https://openrouter.ai/api/v1',
+            apiKey: '',
+            type: 'both'
+          });
+          await this.plugin.saveSettings();
+          this.display(); // Refresh to show new block
+        }));
+
+    (this.plugin.settings.customApiModels || []).forEach((model, index) => {
+      const modelContainer = containerEl.createDiv({ cls: 'osba-custom-model' });
+      modelContainer.style.border = '1px solid var(--background-modifier-border)';
+      modelContainer.style.padding = '10px';
+      modelContainer.style.marginTop = '10px';
+      modelContainer.style.borderRadius = '5px';
+
+      new Setting(modelContainer)
+        .setName(`이름 (표시용)`)
+        .addText(text => text
+          .setValue(model.name)
+          .onChange(async (value) => {
+            model.name = value;
+            await this.plugin.saveSettings();
+          }));
+
+      new Setting(modelContainer)
+        .setName(`지원 타입`)
+        .addDropdown(dropdown => dropdown
+          .addOption('generation', '텍스트 생성 (Draft & Analyze)')
+          .addOption('embedding', '임베딩 (Vault Search)')
+          .addOption('both', '둘 다 (Both)')
+          .setValue(model.type)
+          .onChange(async (value) => {
+            model.type = value as any;
+            await this.plugin.saveSettings();
+          }));
+
+      new Setting(modelContainer)
+        .setName(`모델 ID`)
+        .setDesc('API 서버가 요구하는 실제 모델명 (예: qwen/qwen-2.5-72b-instruct, llama3)')
+        .addText(text => text
+          .setValue(model.modelId)
+          .onChange(async (value) => {
+            model.modelId = value;
+            await this.plugin.saveSettings();
+          }));
+
+      new Setting(modelContainer)
+        .setName(`Base URL`)
+        .setDesc('엔드포인트 URL (마지막에 /v1 포함, /chat/completions 직전까지)')
+        .addText(text => text
+          .setValue(model.baseUrl)
+          .onChange(async (value) => {
+            model.baseUrl = value;
+            await this.plugin.saveSettings();
+          }));
+
+      new Setting(modelContainer)
+        .setName(`API 키 (선택사항)`)
+        .addText(text => text
+          .setValue(model.apiKey)
+          .setPlaceholder('API 키를 입력하세요 (선택)')
+          .onChange(async (value) => {
+            model.apiKey = value;
+            await this.plugin.saveSettings();
+          }));
+
+      new Setting(modelContainer)
+        .addButton(button => button
+          .setButtonText('삭제')
+          .setWarning()
+          .onClick(async () => {
+            this.plugin.settings.customApiModels.splice(index, 1);
+
+            // Revert dropdown selections if the deleted model was active
+            if (this.plugin.settings.quickDraftModel === model.id) {
+              this.plugin.settings.quickDraftModel = 'gemini-2.5-flash';
+            }
+            if (this.plugin.settings.analysisModel === model.id) {
+              this.plugin.settings.analysisModel = 'claude-sonnet-4';
+            }
+            if (this.plugin.settings.embeddingModel === model.id) {
+              this.plugin.settings.embeddingModel = 'openai-small';
+            }
+
+            await this.plugin.saveSettings();
+            this.display();
+          }));
+    });
 
     // ============================================
     // Budget Settings Section

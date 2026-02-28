@@ -20,7 +20,7 @@ import {
 } from './ui/views';
 
 /**
- * Obsidian Second Brain Agent Plugin
+ * Note Agent Plugin
  *
  * Main plugin class that orchestrates all OSBA functionality:
  * - AI-powered note drafting
@@ -83,7 +83,7 @@ export default class OSBAPlugin extends Plugin {
     }, 5000);
 
     console.log('OSBA Plugin loaded successfully');
-    new Notice('Second Brain Agent loaded');
+    new Notice('Note Agent loaded');
   }
 
   async onunload(): Promise<void> {
@@ -111,7 +111,7 @@ export default class OSBAPlugin extends Plugin {
   private async initializeServices(): Promise<void> {
     try {
       // Initialize database with Obsidian file adapter
-      const dbPath = `${this.app.vault.configDir}/plugins/obsidian-second-brain-agent/osba.db`;
+      const dbPath = `${this.app.vault.configDir}/plugins/note-agent/osba.db`;
       this.database = new Database(dbPath);
 
       // Set up persistence callbacks for sql.js database
@@ -120,7 +120,7 @@ export default class OSBAPlugin extends Plugin {
       this.database.setSaveCallback(async (data: Uint8Array) => {
         try {
           // Ensure directory exists
-          const dirPath = `${this.app.vault.configDir}/plugins/obsidian-second-brain-agent`;
+          const dirPath = `${this.app.vault.configDir}/plugins/note-agent`;
           if (!(await adapter.exists(dirPath))) {
             await adapter.mkdir(dirPath);
           }

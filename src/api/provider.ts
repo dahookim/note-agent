@@ -8,6 +8,7 @@ import {
   ProviderType,
   APIError,
   RateLimitError,
+  CustomAPIModel,
 } from '../types';
 
 // ============================================
@@ -224,6 +225,8 @@ export class AIProviderManager {
         return this.generateWithXAI(config, prompt, options);
       case 'openai':
         return this.generateTextWithOpenAI(config, prompt, options);
+      case 'custom':
+        return this.generateWithCustom(config, prompt, options);
       default:
         throw new APIError(`Provider ${config.provider} does not support text generation`, config.provider, 400);
     }
@@ -231,40 +234,48 @@ export class AIProviderManager {
 
   // Resolve model key with custom model support
   private resolveModelKey(modelKey: string): string {
-    if (!this.settings.useCustomModels) {
-      return modelKey;
+    if (this.settings.useCustomModels) {
+      if (modelKey === this.settings.quickDraftModel && this.settings.customQuickDraftModel) {
+        return this.settings.customQuickDraftModel;
+      }
+      if (modelKey === this.settings.analysisModel && this.settings.customAnalysisModel) {
+        return this.settings.customAnalysisModel;
+      }
     }
-
-    // Map standard model keys to custom models if configured
-    if (modelKey === this.settings.quickDraftModel && this.settings.customQuickDraftModel) {
-      return this.settings.customQuickDraftModel;
-    }
-    if (modelKey === this.settings.analysisModel && this.settings.customAnalysisModel) {
-      return this.settings.customAnalysisModel;
-    }
-
     return modelKey;
   }
 
-  // Get model config, supporting custom model IDs
+  // Get model config, supporting custom local models
   private getResolvedModelConfig(resolvedKey: string, originalKey: string): ModelConfig | undefined {
-    // First check if it's a known model key
+    // Check if it's a known built-in model
     if (MODEL_CONFIGS[resolvedKey]) {
       return MODEL_CONFIGS[resolvedKey];
     }
 
-    // If custom model, create a dynamic config based on the original model type
+    // Check if it's a configured custom API model
+    const customModel = this.settings.customApiModels?.find(m => m.id === resolvedKey || m.id === originalKey);
+    if (customModel) {
+      return {
+        id: customModel.modelId, // Use the actual model ID expected by the API
+        provider: 'custom',
+        inputCostPer1M: 0,
+        outputCostPer1M: 0,
+        maxInputTokens: 128000,   // Default generous context
+        maxOutputTokens: 16384,
+      };
+    }
+
+    // If custom model feature is active, create dynamic config based on original
     if (this.settings.useCustomModels && resolvedKey !== originalKey) {
       const baseConfig = MODEL_CONFIGS[originalKey];
       if (baseConfig) {
         return {
           ...baseConfig,
-          id: resolvedKey,  // Use custom model ID
+          id: resolvedKey,
         };
       }
     }
 
-    // Fallback to original key
     return MODEL_CONFIGS[originalKey];
   }
 
@@ -528,12 +539,94 @@ export class AIProviderManager {
     };
   }
 
+  private async generateWithCustom(
+    config: ModelConfig,
+    prompt: string,
+    options: GenerateOptions
+  ): Promise<GenerateResult> {
+    const customModel = this.settings.customApiModels?.find(m => m.modelId === config.id);
+    if (!customModel) {
+      throw new APIError('Custom API model configuration not found', 'custom', 400);
+    }
+
+    const url = `${customModel.baseUrl}/chat/completions`;
+
+    const messages: Array<{ role: string; content: string }> = [];
+
+    if (options.systemPrompt) {
+      messages.push({ role: 'system', content: options.systemPrompt });
+    }
+
+    messages.push({ role: 'user', content: prompt });
+
+    const body: Record<string, unknown> = {
+      model: config.id,
+      messages,
+      max_tokens: options.maxTokens || config.maxOutputTokens,
+    };
+
+    if (options.temperature !== undefined) {
+      body.temperature = options.temperature;
+    }
+
+    if (options.topP !== undefined) {
+      body.top_p = options.topP;
+    }
+
+    if (options.stopSequences && options.stopSequences.length > 0) {
+      body.stop = options.stopSequences;
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (customModel.apiKey) {
+      headers['Authorization'] = `Bearer ${customModel.apiKey}`;
+    }
+
+    const response = await this.makeRequest({
+      url,
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    }, 'custom');
+
+    const data = JSON.parse(response);
+
+    if (!data.choices || data.choices.length === 0) {
+      throw new APIError('No response from custom model', 'custom', 500);
+    }
+
+    const choice = data.choices[0];
+    const text = choice.message?.content || '';
+
+    const inputTokens = data.usage?.prompt_tokens || this.estimateTokens(prompt);
+    const outputTokens = data.usage?.completion_tokens || this.estimateTokens(text);
+
+    return {
+      text,
+      inputTokens,
+      outputTokens,
+      cost: 0,
+      model: config.id,
+      finishReason: choice.finish_reason === 'stop' ? 'stop' : 'length',
+    };
+  }
+
   // ============================================
   // Embedding Generation
   // ============================================
 
   async generateEmbedding(text: string, modelKey?: string): Promise<EmbeddingResult> {
     const model = modelKey || this.settings.embeddingModel;
+
+    // Check if it's a custom API model
+    const customModel = this.settings.customApiModels?.find(m => m.id === model && (m.type === 'embedding' || m.type === 'both'));
+    if (customModel) {
+      return this.generateEmbeddingWithCustom(customModel, text);
+    }
+
     const config = MODEL_CONFIGS[model];
 
     if (!config || config.provider !== 'openai') {
@@ -541,6 +634,53 @@ export class AIProviderManager {
     }
 
     return this.generateWithOpenAI(config, text);
+  }
+
+  private async generateEmbeddingWithCustom(
+    customModel: CustomAPIModel,
+    text: string
+  ): Promise<EmbeddingResult> {
+    const url = `${customModel.baseUrl}/embeddings`;
+
+    // Truncate text if arbitrarily too long, though contexts may vary
+    const truncatedText = text.length > 8000 * 4 ? text.slice(0, 8000 * 4) : text;
+
+    const body = {
+      model: customModel.modelId,
+      input: truncatedText,
+    };
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (customModel.apiKey) {
+      headers['Authorization'] = `Bearer ${customModel.apiKey}`;
+    }
+
+    const response = await this.makeRequest({
+      url,
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    }, 'custom');
+
+    const data = JSON.parse(response);
+
+    if (!data.data || data.data.length === 0) {
+      throw new APIError('No embedding returned from custom model', 'custom', 500);
+    }
+
+    const embedding = data.data[0].embedding;
+    const inputTokens = data.usage?.total_tokens || this.estimateTokens(truncatedText);
+
+    return {
+      embedding,
+      inputTokens,
+      cost: 0,
+      model: customModel.modelId,
+      dimensions: embedding.length,
+    };
   }
 
   private async generateWithOpenAI(
@@ -710,6 +850,18 @@ export class AIProviderManager {
           await this.generateText('grok-4-fast', 'Say "OK"', { maxTokens: 10 });
           return { success: true };
 
+        case 'custom':
+          // Test the first generation custom model if available
+          const customGenModel = this.settings.customApiModels?.find(m => m.type === 'generation' || m.type === 'both');
+          if (customGenModel) {
+            await this.generateWithCustom(
+              { id: customGenModel.modelId, provider: 'custom', maxInputTokens: 1000, maxOutputTokens: 1000, inputCostPer1M: 0, outputCostPer1M: 0 },
+              'Say "OK"', { maxTokens: 10 }
+            );
+            return { success: true };
+          }
+          return { success: false, error: 'No custom API generation models configured' };
+
         default:
           return { success: false, error: 'Unknown provider' };
       }
@@ -731,6 +883,8 @@ export class AIProviderManager {
         return !!this.settings.openaiApiKey;
       case 'xai':
         return !!this.settings.xaiApiKey;
+      case 'custom':
+        return Array.isArray(this.settings.customApiModels) && this.settings.customApiModels.length > 0;
       default:
         return false;
     }
@@ -741,7 +895,7 @@ export class AIProviderManager {
   }
 
   getAvailableModels(type: 'generation' | 'embedding'): string[] {
-    return Object.entries(MODEL_CONFIGS)
+    const availableBuiltIn = Object.entries(MODEL_CONFIGS)
       .filter(([_, config]) => {
         if (type === 'embedding') {
           return config.provider === 'openai';
@@ -750,5 +904,11 @@ export class AIProviderManager {
       })
       .filter(([_, config]) => this.isProviderConfigured(config.provider))
       .map(([key, _]) => key);
+
+    const availableCustom = (this.settings.customApiModels || [])
+      .filter(m => m.type === type || m.type === 'both')
+      .map(m => m.id);
+
+    return [...availableBuiltIn, ...availableCustom];
   }
 }
