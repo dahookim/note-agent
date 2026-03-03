@@ -15,6 +15,7 @@ import {
 } from 'obsidian';
 import type OSBAPlugin from '../main';
 import { AnalysisResult, SearchResult } from '../types';
+import { AIAssistantModal } from './AIAssistantModal';
 
 // ============================================
 // Quick Draft, Main Menu, Analysis Results, Similar Notes 등 모달 UI
@@ -52,8 +53,14 @@ export class OSBAMainMenuModal extends Modal {
       }
     });
 
-    // 2. Quick Draft
-    this.createMenuButton(grid, '✨', '빠른 초안', 'AI와 함께 새로운 노트 작성', 'primary', () => {
+    // 2. AI Assistant (New Templates)
+    this.createMenuButton(grid, '✨', 'AI 템플릿 마법사', '다양한 템플릿으로 AI 작성 보조', 'primary', () => {
+      this.close();
+      new AIAssistantModal(this.app, this.plugin).open();
+    });
+
+    // 3. Quick Draft
+    this.createMenuButton(grid, '⚡', '빠른 초안', 'AI와 함께 새로운 노트 작성', 'secondary', () => {
       this.close();
       new QuickDraftModal(this.app, this.plugin).open();
     });

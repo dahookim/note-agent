@@ -22,10 +22,13 @@ export interface OSBASettings {
   // Custom API Models (OpenAI Compatible)
   customApiModels: CustomAPIModel[];
 
-  // Custom Model Names (for manual override)
   useCustomModels: boolean;
   customQuickDraftModel: string;
   customAnalysisModel: string;
+
+  // Template & UI Upgrades
+  savedPrompts: SavedPrompt[];
+  defaultInsertionMode: InsertionMode;
 
   // Budget Settings
   dailyBudgetLimit: number;  // USD
@@ -67,6 +70,9 @@ export const DEFAULT_SETTINGS: OSBASettings = {
   useCustomModels: false,
   customQuickDraftModel: '',
   customAnalysisModel: '',
+
+  savedPrompts: [],
+  defaultInsertionMode: 'new-note',
 
   dailyBudgetLimit: 1.00,
   monthlyBudgetLimit: 10.00,
@@ -140,6 +146,14 @@ export interface CustomAPIModel {
   apiKey: string;      // API key
   type: 'generation' | 'embedding' | 'both';
 }
+
+export interface SavedPrompt {
+  id: string;
+  name: string;
+  prompt: string;
+}
+
+export type InsertionMode = 'new-note' | 'cursor' | 'end-of-note';
 
 // ============================================
 // Note & Analysis Types
