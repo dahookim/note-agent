@@ -12,6 +12,7 @@ import {
   TFile,
   MarkdownRenderer,
   ButtonComponent,
+  MarkdownView
 } from 'obsidian';
 import type OSBAPlugin from '../main';
 import { AnalysisResult, SearchResult } from '../types';
@@ -309,9 +310,7 @@ export class QuickDraftModal extends Modal {
   }
 
   private async insertToActiveNote(content: string) {
-    const activeView = this.app.workspace.getActiveViewOfType(
-      (this.app as any).plugins.plugins['obsidian']?.MarkdownView
-    );
+    const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 
     const activeFile = this.app.workspace.getActiveFile();
     if (!activeFile) {

@@ -1,4 +1,4 @@
-import { App, Modal, Setting, Notice, TextAreaComponent, DropdownComponent, ButtonComponent, TFile } from 'obsidian';
+import { App, Modal, Setting, Notice, TextAreaComponent, DropdownComponent, ButtonComponent, TFile, MarkdownView } from 'obsidian';
 import OSBAPlugin from '../main';
 import { ANALYSIS_TEMPLATES, TemplateType, getTemplateById, renderPrompt } from '../core/templates';
 import { InsertionMode, SavedPrompt } from '../types';
@@ -358,9 +358,7 @@ export class AIAssistantModal extends Modal {
         let targetContent = '';
 
         // 1. 현재 에디터 내용 혹은 노트 내용 가져오기
-        const activeView = this.app.workspace.getActiveViewOfType(
-            (this.app as any).plugins.plugins['obsidian']?.MarkdownView
-        );
+        const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 
         const activeFile = this.app.workspace.getActiveFile();
 
@@ -419,9 +417,7 @@ export class AIAssistantModal extends Modal {
             this.app.workspace.openLinkText(fileToOpen.path, '', true);
 
         } else if (this.insertionMode === 'cursor') {
-            const activeView = this.app.workspace.getActiveViewOfType(
-                (this.app as any).plugins.plugins['obsidian']?.MarkdownView
-            );
+            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 
             if (activeView && (activeView as any).editor) {
                 const cursor = (activeView as any).editor.getCursor();
