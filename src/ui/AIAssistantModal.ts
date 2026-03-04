@@ -16,6 +16,11 @@ export class AIAssistantModal extends Modal {
     private outputLanguage: string;
     private isProcessing: boolean = false;
 
+    // Preview / Result State
+    private viewMode: 'prompt' | 'result' = 'prompt';
+    private aiOutput: string = '';
+    private activeFileAtOpen: TFile | null = null;
+
     // UI Elements
     private contentContainer!: HTMLElement;
     private previewTextArea!: TextAreaComponent;
@@ -25,6 +30,7 @@ export class AIAssistantModal extends Modal {
         this.plugin = plugin;
         this.insertionMode = this.plugin.settings.defaultInsertionMode || 'new-note';
         this.outputLanguage = this.plugin.settings.defaultOutputLanguage || 'Auto';
+        this.activeFileAtOpen = this.app.workspace.getActiveFile();
 
         // Default to first easy-gate template
         this.selectedTemplateId = 'basic-summary';
@@ -90,6 +96,7 @@ export class AIAssistantModal extends Modal {
                 // 리셋 상태 (탭 전환 시)
                 this.selectedTemplateId = null;
                 this.customPromptId = null;
+                this.viewMode = 'prompt';
 
                 // 각 탭별 기본 선택
                 if (id === 'easy-gate') this.selectedTemplateId = 'basic-summary';
@@ -235,7 +242,16 @@ export class AIAssistantModal extends Modal {
     }
 
     private renderRightPanel(container: HTMLElement) {
-        container.createEl('h3', { text: '👁️ 프롬프트 미리보기' }).style.margin = '0 0 5px 0';
+        const isPromptMode = this.viewMode === 'prompt';
+        const headerText = isPromptMode ? '👁️ 프롬프트 미리보기' : '✨ AI 생성 결과 (편집 가능)';
+        container.createEl('h3', { text: headerText }).style.margin = '0 0 5px 0';
+
+        if (!isPromptMode) {
+            container.createEl('p', {
+                text: '아래 텍스트를 직접 수정한 뒤 원하는 노트 위치에 삽입할 수 있습니다.',
+                cls: 'osba-modal-desc',
+            }).style.margin = '0 0 10px 0';
+        }
 
         const isCustom = this.activeTab === 'custom';
 
@@ -243,20 +259,28 @@ export class AIAssistantModal extends Modal {
             .setClass('assistant-preview-setting')
             .addTextArea(text => {
                 this.previewTextArea = text;
-                text.setValue(this.promptText);
+                text.setValue(isPromptMode ? this.promptText : this.aiOutput);
                 text.inputEl.style.cssText = `
                     width: 100%;
-                    min-height: 180px;
+                    min-height: ${isPromptMode ? '180px' : '280px'};
                     resize: vertical;
                     font-size: 13px;
                 `;
 
-                if (!isCustom) {
-                    text.setDisabled(true); // Default 템플릿들은 읽기 전용
+                if (isPromptMode) {
+                    if (!isCustom) {
+                        text.setDisabled(true); // Default 템플릿들은 읽기 전용
+                    } else {
+                        text.setPlaceholder('커스텀 프롬프트를 작성하세요...');
+                        text.onChange(value => {
+                            this.promptText = value;
+                        });
+                    }
                 } else {
-                    text.setPlaceholder('커스텀 프롬프트를 작성하세요...');
+                    // Result mode is always editable
+                    text.setDisabled(false);
                     text.onChange(value => {
-                        this.promptText = value;
+                        this.aiOutput = value;
                     });
                 }
             });
@@ -265,7 +289,7 @@ export class AIAssistantModal extends Modal {
         textAreaSetting.settingEl.style.padding = '0';
 
         // "Custom" 탭이고 현재 작성중인 프롬프트가 있으면 저장 버튼 스니펫 
-        if (isCustom) {
+        if (isPromptMode && isCustom) {
             const saveRow = container.createDiv();
             saveRow.style.cssText = 'display: flex; justify-content: flex-end; margin-top: 5px;';
 
@@ -355,23 +379,40 @@ export class AIAssistantModal extends Modal {
         actionGroup.style.display = 'flex';
         actionGroup.style.gap = '10px';
 
-        new ButtonComponent(actionGroup)
-            .setButtonText('취소')
-            .onClick(() => this.close());
+        if (this.viewMode === 'prompt') {
+            new ButtonComponent(actionGroup)
+                .setButtonText('취소')
+                .onClick(() => this.close());
 
-        new ButtonComponent(actionGroup)
-            .setButtonText('🚀 실행하기')
-            .setCta()
-            .onClick(async () => {
-                if (!this.promptText || this.promptText.trim() === '') {
-                    new Notice('프롬프트가 비어있습니다.');
-                    return;
-                }
+            new ButtonComponent(actionGroup)
+                .setButtonText('🚀 AI 실행')
+                .setCta()
+                .onClick(async () => {
+                    if (!this.promptText || this.promptText.trim() === '') {
+                        new Notice('프롬프트가 비어있습니다.');
+                        return;
+                    }
 
-                if (this.isProcessing) return;
+                    if (this.isProcessing) return;
 
-                await this.executeAI();
-            });
+                    await this.executeAI();
+                });
+        } else {
+            new ButtonComponent(actionGroup)
+                .setButtonText('🔙 이전으로')
+                .onClick(() => {
+                    this.viewMode = 'prompt';
+                    this.onOpen();
+                });
+
+            new ButtonComponent(actionGroup)
+                .setButtonText('📥 결과 삽입하기')
+                .setCta()
+                .onClick(async () => {
+                    this.close();
+                    await this.handleInsertion(this.aiOutput, this.activeFileAtOpen);
+                });
+        }
     }
 
     private async executeAI() {
@@ -407,20 +448,23 @@ export class AIAssistantModal extends Modal {
             ? this.promptText.replace('{{content}}', targetContent)
             : `${this.promptText}\n\n${targetContent}`) + languageInstruction;
 
-        this.close(); // 요청 시작 시 모달 닫기
+        // this.close(); // 요청 시작 시 모달 닫기 - REMOVED
 
         await withProgressModal(this.app, 'AI 템플릿 처리 중...', async (progressModal) => {
             try {
                 progressModal.updateProgress(10, '요청을 준비 중입니다...');
 
                 const result = await this.plugin.connectionAnalyzer.generateQuickDraft(finalPrompt);
-                progressModal.updateProgress(80, '결과 삽입 중...');
+                progressModal.updateProgress(90, '결과 렌더링 중...');
 
-                const output = result.content;
-                await this.handleInsertion(output, activeFile);
+                this.aiOutput = result.content;
+                this.viewMode = 'result';
 
                 new Notice(`분석 완료 (비용: $${result.cost.toFixed(4)})`);
                 progressModal.complete(`완료 (비용: $${result.cost.toFixed(4)})`);
+
+                // 모달 데이터를 갱신 (결과 미리보기)
+                this.onOpen();
             } catch (error) {
                 console.error('AI Assistant Error:', error);
                 const msg = `오류 발생: ${error instanceof Error ? error.message : '알 수 없는 오류'}`;
