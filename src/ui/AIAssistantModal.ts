@@ -1,4 +1,5 @@
 import { App, Modal, Setting, Notice, TextAreaComponent, DropdownComponent, ButtonComponent, TFile, MarkdownView } from 'obsidian';
+import { withProgressModal } from './progress-modal';
 import OSBAPlugin from '../main';
 import { ANALYSIS_TEMPLATES, TemplateType, getTemplateById, renderPrompt } from '../core/templates';
 import { InsertionMode, SavedPrompt } from '../types';
@@ -12,6 +13,7 @@ export class AIAssistantModal extends Modal {
     private customPromptId: string | null = null;
     private promptText: string = '';
     private insertionMode: InsertionMode;
+    private outputLanguage: string;
     private isProcessing: boolean = false;
 
     // UI Elements
@@ -22,6 +24,7 @@ export class AIAssistantModal extends Modal {
         super(app);
         this.plugin = plugin;
         this.insertionMode = this.plugin.settings.defaultInsertionMode || 'new-note';
+        this.outputLanguage = this.plugin.settings.defaultOutputLanguage || 'Auto';
 
         // Default to first easy-gate template
         this.selectedTemplateId = 'basic-summary';
@@ -311,6 +314,25 @@ export class AIAssistantModal extends Modal {
         const footerInfo = container.createDiv();
         footerInfo.style.cssText = 'margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--background-modifier-border); display: flex; justify-content: space-between; align-items: center;';
 
+        const languageGroup = footerInfo.createDiv();
+        languageGroup.style.display = 'flex';
+        languageGroup.style.alignItems = 'center';
+        languageGroup.style.gap = '10px';
+        languageGroup.createSpan({ text: '출력 언어:', cls: 'setting-item-name' });
+
+        const langDropdown = new DropdownComponent(languageGroup);
+        langDropdown.addOption('Auto', 'Auto (기본값)');
+        langDropdown.addOption('한국어', '한국어');
+        langDropdown.addOption('English', 'English');
+        langDropdown.addOption('日本語', '日本語');
+        langDropdown.addOption('中文', '中文');
+        langDropdown.setValue(this.outputLanguage);
+        langDropdown.onChange(async (val: string) => {
+            this.outputLanguage = val;
+            this.plugin.settings.defaultOutputLanguage = this.outputLanguage;
+            await this.plugin.saveSettings();
+        });
+
         const insertOptionsGroup = footerInfo.createDiv();
         insertOptionsGroup.style.display = 'flex';
         insertOptionsGroup.style.alignItems = 'center';
@@ -373,33 +395,41 @@ export class AIAssistantModal extends Modal {
         }
 
         if (!targetContent.trim()) {
-            new Notice('참조할 내용(선택된 텍스트 혹은 노트 내용)이 발견되지 않았습니다. 백지 상태에서 시작합니다.');
+            new Notice('참조할 내용(선택된 텍스트 혹은 노트 내용)이 발견되지 않았습니다. 기본 상태에서 메타 분석을 시작합니다.');
         }
 
         // 프롬프트 구성
-        // {{content}} 치환
-        const finalPrompt = this.promptText.includes('{{content}}')
-            ? this.promptText.replace('{{content}}', targetContent)
-            : `${this.promptText}\n\n${targetContent}`;
+        const languageInstruction = this.outputLanguage !== 'Auto'
+            ? `\n\n[중요 지침] 반드시 다음 언어로 답변을 작성하세요: **${this.outputLanguage}**`
+            : '';
 
-        new Notice('AI 분석 요청중...');
+        const finalPrompt = (this.promptText.includes('{{content}}')
+            ? this.promptText.replace('{{content}}', targetContent)
+            : `${this.promptText}\n\n${targetContent}`) + languageInstruction;
+
         this.close(); // 요청 시작 시 모달 닫기
 
-        try {
-            // connectionAnalyzer에 임시로 넣거나, ProviderManager를 직접 호출
-            // QuickDraft 로직 재사용 (이후 리팩토링 가능)
-            const result = await this.plugin.connectionAnalyzer.generateQuickDraft(finalPrompt);
-            const output = result.content;
+        await withProgressModal(this.app, 'AI 템플릿 처리 중...', async (progressModal) => {
+            try {
+                progressModal.updateProgress(10, '요청을 준비 중입니다...');
 
-            await this.handleInsertion(output, activeFile);
-            new Notice(`분석 완료 (비용: $${result.cost.toFixed(4)})`);
+                const result = await this.plugin.connectionAnalyzer.generateQuickDraft(finalPrompt);
+                progressModal.updateProgress(80, '결과 삽입 중...');
 
-        } catch (error) {
-            console.error('AI Assistant Error:', error);
-            new Notice(`오류 발생: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
-        } finally {
-            this.isProcessing = false;
-        }
+                const output = result.content;
+                await this.handleInsertion(output, activeFile);
+
+                new Notice(`분석 완료 (비용: $${result.cost.toFixed(4)})`);
+                progressModal.complete(`완료 (비용: $${result.cost.toFixed(4)})`);
+            } catch (error) {
+                console.error('AI Assistant Error:', error);
+                const msg = `오류 발생: ${error instanceof Error ? error.message : '알 수 없는 오류'}`;
+                new Notice(msg);
+                progressModal.setError(msg);
+            } finally {
+                this.isProcessing = false;
+            }
+        });
     }
 
     private async handleInsertion(output: string, activeFile: TFile | null) {

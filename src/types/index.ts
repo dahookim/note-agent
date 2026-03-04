@@ -29,6 +29,7 @@ export interface OSBASettings {
   // Template & UI Upgrades
   savedPrompts: SavedPrompt[];
   defaultInsertionMode: InsertionMode;
+  defaultOutputLanguage: string;
 
   // Budget Settings
   dailyBudgetLimit: number;  // USD
@@ -73,6 +74,7 @@ export const DEFAULT_SETTINGS: OSBASettings = {
 
   savedPrompts: [],
   defaultInsertionMode: 'new-note',
+  defaultOutputLanguage: 'Auto',
 
   dailyBudgetLimit: 1.00,
   monthlyBudgetLimit: 10.00,
