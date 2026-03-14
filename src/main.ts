@@ -6,7 +6,8 @@ import { AIProviderManager } from './api/provider';
 import { EmbeddingService } from './core/embeddings';
 import { ConnectionAnalyzer } from './core/analyzer';
 import { FrontmatterManager } from './core/frontmatter';
-import { QuickDraftModal, OSBAMainMenuModal } from './ui/modals';
+import { QuickDraftModal } from './ui/modals';
+import { AIAssistantModal } from './ui/AIAssistantModal';
 import { ProgressModal } from './ui/progress-modal';
 import {
   JobQueueView,
@@ -73,7 +74,7 @@ export default class OSBAPlugin extends Plugin {
 
     // Add ribbon icon
     this.addRibbonIcon('brain-circuit', 'OSBA: Quick Actions', () => {
-      new OSBAMainMenuModal(this.app, this).open();
+      new AIAssistantModal(this.app, this).open();
     });
 
     // Delay plugin ready flag to prevent auto-analysis on startup
@@ -217,7 +218,7 @@ export default class OSBAPlugin extends Plugin {
       id: 'open-main-menu',
       name: 'Open Main Menu - Quick Actions',
       callback: () => {
-        new OSBAMainMenuModal(this.app, this).open();
+        new AIAssistantModal(this.app, this).open();
       },
     });
 

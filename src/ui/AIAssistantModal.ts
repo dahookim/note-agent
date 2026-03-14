@@ -10,7 +10,7 @@ export class AIAssistantModal extends Modal {
     private plugin: OSBAPlugin;
 
     // UI State
-    private activeTab: 'easy-gate' | 'stargate' | 'custom' | 'multi-source' | 'note-agent' = 'easy-gate';
+    private activeTab: 'note-agent' | 'easy-gate' | 'stargate' | 'custom' | 'multi-source' = 'note-agent';
     private selectedTemplateId: string | null = null;
     private customPromptId: string | null = null;
     private promptText: string = '';
@@ -41,9 +41,7 @@ export class AIAssistantModal extends Modal {
         this.outputLanguage = this.plugin.settings.defaultOutputLanguage || 'Auto';
         this.activeFileAtOpen = this.app.workspace.getActiveFile();
 
-        // Default to first easy-gate template
-        this.selectedTemplateId = 'basic-summary';
-        this.updatePreviewText();
+        this.updateNoteAgentPrompt();
 
         // Auto-add current file to multi-source if available
         if (this.activeFileAtOpen) {
@@ -76,25 +74,89 @@ export class AIAssistantModal extends Modal {
         contentEl.addClass('ai-assistant-modal');
 
         // 모달 넓게
-        this.modalEl.style.width = '700px';
+        this.modalEl.style.width = '750px';
         this.modalEl.style.maxWidth = '90vw';
 
-        // 헤더
-        contentEl.createEl('h2', { text: '✨ AI 템플릿 마법사' });
-        contentEl.createEl('p', {
+        // 헤더 영역 설정
+        const headerContainer = contentEl.createDiv();
+        headerContainer.style.cssText = 'display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;';
+
+        const titleDiv = headerContainer.createDiv();
+        titleDiv.createEl('h2', { text: '✨ AI 템플릿 마법사' }).style.margin = '0 0 5px 0';
+        titleDiv.createEl('p', {
             text: '다양한 템플릿을 선택하거나 직접 프롬프트를 작성하여 노트를 생성/수정하세요.',
             cls: 'osba-modal-desc',
-        });
+        }).style.margin = '0';
+
+        // 모델 선택 UI
+        const modelSettingsContainer = headerContainer.createDiv();
+        modelSettingsContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px; background: var(--background-secondary-alt); padding: 10px; border-radius: 8px; border: 1px solid var(--background-modifier-border); min-width: 250px;';
+
+        // LLM 모델 드롭다운
+        const llmSetting = new Setting(modelSettingsContainer)
+            .setName('🎯 LLM')
+            .addDropdown(dropdown => {
+                dropdown
+                    .addOption('claude-sonnet-4', 'Claude Sonnet 4')
+                    .addOption('claude-opus-4', 'Claude Opus 4')
+                    .addOption('claude-opus-4.5', 'Claude Opus 4.5')
+                    .addOption('gemini-2.5-pro', 'Gemini 2.5 Pro')
+                    .addOption('gemini-2.5-flash', 'Gemini 2.5 Flash')
+                    .addOption('gpt-4.1', 'GPT-4.1')
+                    .addOption('gpt-4o', 'GPT-4o')
+                    .addOption('grok-4-fast', 'Grok 4.1 Fast');
+
+                this.plugin.settings.customApiModels?.filter(m => m.type === 'generation' || m.type === 'both').forEach(model => {
+                    dropdown.addOption(model.id, `[Custom] ${model.name}`);
+                });
+
+                dropdown.setValue(this.plugin.settings.analysisModel)
+                    .onChange(async (value) => {
+                        this.plugin.settings.analysisModel = value;
+                        this.plugin.settings.quickDraftModel = value;
+                        await this.plugin.saveSettings();
+                        new Notice(`LLM 모델 변경됨: ${value}`);
+                    });
+
+                dropdown.selectEl.style.width = '140px';
+            });
+        llmSetting.settingEl.style.border = 'none';
+        llmSetting.settingEl.style.padding = '0';
+
+        // Embedding 모델 드롭다운
+        const embedSetting = new Setting(modelSettingsContainer)
+            .setName('🧠 임베딩')
+            .addDropdown(dropdown => {
+                dropdown
+                    .addOption('openai-small', 'text-embedding-3-small')
+                    .addOption('openai-large', 'text-embedding-3-large');
+
+                this.plugin.settings.customApiModels?.filter(m => m.type === 'embedding' || m.type === 'both').forEach(model => {
+                    dropdown.addOption(model.id, `[Custom] ${model.name}`);
+                });
+
+                dropdown.setValue(this.plugin.settings.embeddingModel)
+                    .onChange(async (value) => {
+                        this.plugin.settings.embeddingModel = value;
+                        this.plugin.settings.useCustomModels = false; // 기본 모델 리셋 로직을 위해 false 방어
+                        await this.plugin.saveSettings();
+                        new Notice(`임베딩 모델 변경됨: ${value}`);
+                    });
+                dropdown.selectEl.style.width = '140px';
+            });
+        embedSetting.settingEl.style.border = 'none';
+        embedSetting.settingEl.style.padding = '0';
+
 
         // 메인 레이아웃 (왼쪽 탭/옵션, 오른쪽 미리보기)
         const mainContainer = contentEl.createDiv({ cls: 'assistant-main-container' });
         mainContainer.style.cssText = 'display: flex; gap: 20px; align-items: flex-start;';
 
         const leftPanel = mainContainer.createDiv({ cls: 'assistant-left-panel' });
-        leftPanel.style.cssText = 'flex: 1;';
+        leftPanel.style.cssText = 'flex: 1; min-width: 250px;';
 
         const rightPanel = mainContainer.createDiv({ cls: 'assistant-right-panel' });
-        rightPanel.style.cssText = 'flex: 1; display: flex; flex-direction: column; gap: 10px;';
+        rightPanel.style.cssText = 'flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 350px;';
 
         this.renderTabs(leftPanel);
 
