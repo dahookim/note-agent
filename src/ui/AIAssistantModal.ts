@@ -10,13 +10,14 @@ export class AIAssistantModal extends Modal {
     private plugin: OSBAPlugin;
 
     // UI State
-    private activeTab: 'easy-gate' | 'stargate' | 'custom' | 'multi-source' = 'easy-gate';
+    private activeTab: 'easy-gate' | 'stargate' | 'custom' | 'multi-source' | 'note-agent' = 'easy-gate';
     private selectedTemplateId: string | null = null;
     private customPromptId: string | null = null;
     private promptText: string = '';
     private insertionMode: InsertionMode;
     private outputLanguage: string;
     private isProcessing: boolean = false;
+    private noteAgentFeature: 'analyze' | 'quick-draft' | 'similar' | 'index-note' | 'index-all' | 'cost-dashboard' | 'job-queue' = 'analyze';
 
     // Multi-source State
     private sources: SourceItem[] = [];
@@ -133,18 +134,20 @@ export class AIAssistantModal extends Modal {
                 if (id === 'easy-gate') this.selectedTemplateId = 'basic-summary';
                 else if (id === 'stargate') this.selectedTemplateId = 'briefing';
                 else if (id === 'multi-source') this.updateMultiSourcePrompt();
+                else if (id === 'note-agent') this.updateNoteAgentPrompt();
 
-                // 프롬프트 강제 동기화 (커스텀 탭 및 멀티소스 탭이 아닌경우)
-                if (id !== 'custom' && id !== 'multi-source') this.updatePreviewText();
+                // 프롬프트 강제 동기화 (커스텀/멀티소스/노트에이전트 탭이 아닌경우)
+                if (id !== 'custom' && id !== 'multi-source' && id !== 'note-agent') this.updatePreviewText();
 
                 this.onOpen(); // 다시 렌더링
             };
         };
 
-        createTab('easy-gate', 'Easy Gate (기본)');
-        createTab('stargate', 'Stargate (심층)');
-        createTab('custom', 'Custom (커스텀)');
-        createTab('multi-source', 'Multi-Source (멀티 소스)');
+        createTab('easy-gate', 'Easy Gate');
+        createTab('stargate', 'Stargate');
+        createTab('custom', 'Custom');
+        createTab('multi-source', 'Multi-Source');
+        createTab('note-agent', 'Note Agent');
     }
 
     private renderTabContent() {
@@ -160,6 +163,8 @@ export class AIAssistantModal extends Modal {
             this.renderCustomTab();
         } else if (this.activeTab === 'multi-source') {
             this.renderMultiSourceTypeList(this.contentContainer);
+        } else if (this.activeTab === 'note-agent') {
+            this.renderNoteAgentTab();
         }
     }
 
@@ -427,6 +432,135 @@ export class AIAssistantModal extends Modal {
         }
     }
 
+    private renderNoteAgentTab() {
+        const container = this.contentContainer;
+        container.createEl('h3', { text: 'Note Agent 기능' }).style.margin = '0 0 10px 0';
+
+        const listDiv = container.createDiv();
+        listDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto;';
+
+        const features: { id: 'analyze' | 'quick-draft' | 'similar' | 'index-note' | 'index-all' | 'cost-dashboard' | 'job-queue'; icon: string; label: string; desc: string }[] = [
+            { id: 'analyze', icon: '🔗', label: '연결 분석', desc: 'AI로 노트 간 연결 및 지식 갭 분석' },
+            { id: 'quick-draft', icon: '✨', label: '빠른 초안', desc: '관련 노트 컨텍스트로 새 콘텐츠 생성' },
+            { id: 'similar', icon: '🔍', label: '유사 노트 찾기', desc: '임베딩 기반 유사 노트 검색' },
+            { id: 'index-note', icon: '📝', label: '현재 노트 인덱싱', desc: '현재 노트 임베딩 생성' },
+            { id: 'index-all', icon: '📦', label: '전체 인덱싱', desc: 'Vault 전체 노트 임베딩 생성' },
+            { id: 'cost-dashboard', icon: '💰', label: '비용 대시보드', desc: 'AI 사용량 및 비용 확인' },
+            { id: 'job-queue', icon: '📋', label: '작업 대기열', desc: '진행 중인 작업 확인' },
+        ];
+
+        features.forEach(f => {
+            const isSelected = this.noteAgentFeature === f.id;
+            const row = listDiv.createDiv();
+            row.style.cssText = `
+                padding: 10px; border-radius: 6px; cursor: pointer;
+                border: 1px solid ${isSelected ? 'var(--interactive-accent)' : 'var(--background-modifier-border)'};
+                background: ${isSelected ? 'var(--background-modifier-hover)' : 'transparent'};
+                transition: all 0.2s ease-in-out;
+            `;
+            row.createDiv({ text: `${f.icon} ${f.label}` }).style.cssText = 'font-weight: bold; margin-bottom: 2px;';
+            row.createDiv({ text: f.desc }).style.cssText = 'font-size: 12px; color: var(--text-muted);';
+            row.onclick = () => {
+                this.noteAgentFeature = f.id;
+                this.viewMode = 'prompt';
+                this.updateNoteAgentPrompt();
+                this.onOpen();
+            };
+        });
+    }
+
+    private updateNoteAgentPrompt() {
+        if (this.noteAgentFeature === 'analyze') {
+            this.promptText = '현재 노트를 AI로 분석하여 다른 노트와의 연결 관계와 지식 갭을 발견합니다.\n\n분석 기준:\n1. 개념적 연관성\n2. 논리적 관계 (확장/지지/반박)\n3. 사례 관계\n4. 지식 갭 발견';
+        } else if (this.noteAgentFeature === 'quick-draft') {
+            if (!this.promptText || this.promptText.startsWith('현재 노트를 AI로') || this.promptText.startsWith('현재 노트와 의미적으로')) {
+                this.promptText = '';
+            }
+        } else if (this.noteAgentFeature === 'similar') {
+            this.promptText = '현재 노트와 의미적으로 유사한 노트 10개를 임베딩 벡터 기반으로 검색합니다.\n\n(AI 프롬프트 없이 임베딩 유사도로 검색)';
+        }
+    }
+
+    private renderNoteAgentRightPanel(container: HTMLElement) {
+        const feature = this.noteAgentFeature;
+
+        // 유틸/뷰 기능: 즉시 실행 UI
+        if (feature === 'index-note' || feature === 'index-all' || feature === 'cost-dashboard' || feature === 'job-queue') {
+            const labels: Record<string, { icon: string; title: string; desc: string; btnText: string }> = {
+                'index-note': { icon: '📝', title: '현재 노트 인덱싱', desc: '현재 노트의 임베딩 벡터를 생성하여 데이터베이스에 저장합니다. 유사 노트 검색, 연결 분석 등의 전제 조건입니다.', btnText: '🚀 인덱싱 실행' },
+                'index-all': { icon: '📦', title: '전체 Vault 인덱싱', desc: 'Vault 내 모든 마크다운 노트의 임베딩 벡터를 생성합니다. 노트 수에 따라 시간이 걸릴 수 있습니다.', btnText: '🚀 전체 인덱싱 실행' },
+                'cost-dashboard': { icon: '💰', title: '비용 대시보드', desc: 'AI 사용량 및 비용을 사이드바에서 확인합니다.', btnText: '📊 대시보드 열기' },
+                'job-queue': { icon: '📋', title: '작업 대기열', desc: '진행 중인 작업 목록을 사이드바에서 확인합니다.', btnText: '📋 대기열 열기' },
+            };
+            const info = labels[feature];
+            container.createEl('h3', { text: `${info.icon} ${info.title}` }).style.margin = '0 0 10px 0';
+            container.createEl('p', { text: info.desc, cls: 'osba-modal-desc' }).style.margin = '0 0 20px 0';
+
+            new ButtonComponent(container)
+                .setButtonText(info.btnText)
+                .setCta()
+                .onClick(async () => {
+                    if (feature === 'index-note') {
+                        const file = this.app.workspace.getActiveFile();
+                        if (file && file.extension === 'md') {
+                            await this.plugin.generateEmbedding(file);
+                            new Notice('인덱싱 완료!');
+                        } else {
+                            new Notice('활성화된 마크다운 노트가 없습니다.');
+                        }
+                    } else if (feature === 'index-all') {
+                        this.close();
+                        await this.plugin.batchIndexVault();
+                    } else if (feature === 'cost-dashboard') {
+                        this.close();
+                        this.plugin.activateView('cost-dashboard');
+                    } else if (feature === 'job-queue') {
+                        this.close();
+                        this.plugin.activateView('job-queue');
+                    }
+                });
+            return;
+        }
+
+        // AI/임베딩 기능: 프롬프트/결과 플로우
+        const isPromptMode = this.viewMode === 'prompt';
+        const headerText = isPromptMode ? '👁️ 프롬프트 미리보기' : '✨ AI 생성 결과 (편집 가능)';
+        container.createEl('h3', { text: headerText }).style.margin = '0 0 5px 0';
+
+        if (!isPromptMode) {
+            container.createEl('p', { text: '아래 텍스트를 직접 수정한 뒤 원하는 노트 위치에 삽입할 수 있습니다.', cls: 'osba-modal-desc' }).style.margin = '0 0 10px 0';
+            if (this.usedPromptText) {
+                const promptBlock = container.createDiv();
+                promptBlock.style.cssText = 'background: var(--background-secondary); border: 1px solid var(--background-modifier-border); border-radius: 6px; padding: 10px; margin-bottom: 10px; max-height: 100px; overflow-y: auto;';
+                promptBlock.createEl('div', { text: '📋 요청 프롬프트' }).style.cssText = 'font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--text-muted);';
+                promptBlock.createEl('div', { text: this.usedPromptText }).style.cssText = 'font-size: 12px; color: var(--text-normal); white-space: pre-wrap; word-break: break-word;';
+            }
+        }
+
+        const isEditable = isPromptMode && feature === 'quick-draft';
+
+        const textAreaSetting = new Setting(container)
+            .setClass('assistant-preview-setting')
+            .addTextArea(text => {
+                this.previewTextArea = text;
+                text.setValue(isPromptMode ? this.promptText : this.aiOutput);
+                text.inputEl.style.cssText = `width: 100%; min-height: ${isPromptMode ? '150px' : '280px'}; resize: vertical; font-size: 13px;`;
+                if (isPromptMode) {
+                    if (isEditable) {
+                        text.setPlaceholder('작성할 내용을 설명해주세요...');
+                        text.onChange(value => { this.promptText = value; });
+                    } else {
+                        text.setDisabled(true);
+                    }
+                } else {
+                    text.setDisabled(false);
+                    text.onChange(value => { this.aiOutput = value; });
+                }
+            });
+        textAreaSetting.settingEl.style.border = 'none';
+        textAreaSetting.settingEl.style.padding = '0';
+    }
+
     private updatePreviewText() {
         if (this.selectedTemplateId && this.selectedTemplateId !== 'custom') {
             const template = getTemplateById(this.selectedTemplateId);
@@ -440,6 +574,11 @@ export class AIAssistantModal extends Modal {
     private renderRightPanel(container: HTMLElement) {
         if (this.activeTab === 'multi-source' && this.viewMode === 'prompt') {
             this.renderMultiSourceRightPanel(container);
+            return;
+        }
+
+        if (this.activeTab === 'note-agent') {
+            this.renderNoteAgentRightPanel(container);
             return;
         }
 
@@ -800,6 +939,10 @@ export class AIAssistantModal extends Modal {
             }
             // 모든 소스들을 마크다운 형식으로 병합
             targetContent = this.sources.map((s, idx) => `### Source [${idx + 1}]: ${s.title}\n${s.content}\n`).join('\n---\n');
+        } else if (this.activeTab === 'note-agent') {
+            // Note Agent 탭 전용 실행 로직
+            await this.executeNoteAgentFeature();
+            return;
         } else {
             // 기존 단일 파일/선택영역 모드
             // 1. 현재 에디터 내용 혹은 노트 내용 가져오기
@@ -889,6 +1032,122 @@ export class AIAssistantModal extends Modal {
                 new Notice('현재 활성화된 노트가 없습니다. 새 노트로 생성합니다.');
                 await this.handleInsertion(output, null); // Fallback
             }
+        }
+    }
+
+    private async executeNoteAgentFeature() {
+        const feature = this.noteAgentFeature;
+
+        if (feature === 'analyze') {
+            const file = this.activeFileAtOpen;
+            if (!file || file.extension !== 'md') {
+                new Notice('활성화된 마크다운 노트가 없습니다.');
+                this.isProcessing = false;
+                return;
+            }
+            await withProgressModal(this.app, '연결 분석 중...', async (progressModal) => {
+                try {
+                    progressModal.updateProgress(30, '관련 노트 찾는 중...');
+                    const result = await this.plugin.connectionAnalyzer.analyzeNote(file);
+                    progressModal.updateProgress(90, '결과 렌더링 중...');
+
+                    // 결과를 텍스트로 변환
+                    let output = `# 분석 결과: ${file.basename}\n\n`;
+                    if (result.connections.length > 0) {
+                        output += `## 🔗 발견된 연결\n`;
+                        for (const conn of result.connections) {
+                            output += `- **[[${conn.targetPath}]]** (${(conn.confidence * 100).toFixed(0)}%) - ${conn.reasoning}\n`;
+                        }
+                        output += '\n';
+                    }
+                    if (result.gaps.length > 0) {
+                        output += `## 🔍 지식 갭\n`;
+                        for (const gap of result.gaps) {
+                            output += `- **${gap.topic}**: ${gap.description}\n`;
+                        }
+                        output += '\n';
+                    }
+                    if (result.insights) {
+                        output += `## 💡 인사이트\n${result.insights}\n`;
+                    }
+                    output += `\n> 💰 분석 비용: $${result.cost.toFixed(4)}`;
+
+                    this.aiOutput = output;
+                    this.viewMode = 'result';
+                    new Notice(`분석 완료 (비용: $${result.cost.toFixed(4)})`);
+                    progressModal.complete(`완료 (비용: $${result.cost.toFixed(4)})`);
+                    this.onOpen();
+                } catch (error) {
+                    const msg = `오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`;
+                    new Notice(msg);
+                    progressModal.setError(msg);
+                } finally {
+                    this.isProcessing = false;
+                }
+            });
+        } else if (feature === 'quick-draft') {
+            if (!this.promptText.trim()) {
+                new Notice('작성 요청을 입력해주세요.');
+                this.isProcessing = false;
+                return;
+            }
+            await withProgressModal(this.app, '빠른 초안 생성 중...', async (progressModal) => {
+                try {
+                    progressModal.updateProgress(30, 'AI 생성 중...');
+                    const result = await this.plugin.connectionAnalyzer.generateQuickDraft(this.promptText);
+                    progressModal.updateProgress(90, '결과 렌더링 중...');
+                    this.aiOutput = result.content;
+                    this.viewMode = 'result';
+                    new Notice(`생성 완료 (비용: $${result.cost.toFixed(4)})`);
+                    progressModal.complete(`완료 (비용: $${result.cost.toFixed(4)})`);
+                    this.onOpen();
+                } catch (error) {
+                    const msg = `오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`;
+                    new Notice(msg);
+                    progressModal.setError(msg);
+                } finally {
+                    this.isProcessing = false;
+                }
+            });
+        } else if (feature === 'similar') {
+            const file = this.activeFileAtOpen;
+            if (!file || file.extension !== 'md') {
+                new Notice('활성화된 마크다운 노트가 없습니다.');
+                this.isProcessing = false;
+                return;
+            }
+            await withProgressModal(this.app, '유사 노트 검색 중...', async (progressModal) => {
+                try {
+                    progressModal.updateProgress(30, '임베딩 검색 중...');
+                    const content = await this.app.vault.read(file);
+                    const similar = await this.plugin.embeddingService.searchByQuery(content, 10);
+                    progressModal.updateProgress(90, '결과 렌더링 중...');
+
+                    let output = `# 유사 노트: ${file.basename}\n\n`;
+                    if (similar.length === 0) {
+                        output += '유사한 노트를 찾을 수 없습니다. 먼저 인덱싱을 실행해주세요.';
+                    } else {
+                        output += '| # | 노트 | 유사도 |\n|---|------|--------|\n';
+                        similar.forEach((n, i) => {
+                            output += `| ${i + 1} | [[${n.title}]] | ${(n.similarity * 100).toFixed(1)}% |\n`;
+                        });
+                    }
+
+                    this.aiOutput = output;
+                    this.viewMode = 'result';
+                    new Notice(`유사 노트 ${similar.length}개 발견`);
+                    progressModal.complete(`완료: ${similar.length}개 발견`);
+                    this.onOpen();
+                } catch (error) {
+                    const msg = `오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`;
+                    new Notice(msg);
+                    progressModal.setError(msg);
+                } finally {
+                    this.isProcessing = false;
+                }
+            });
+        } else {
+            this.isProcessing = false;
         }
     }
 
