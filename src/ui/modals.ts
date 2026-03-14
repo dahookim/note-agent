@@ -151,6 +151,8 @@ export class QuickDraftModal extends Modal {
   private insertionMode: InsertionMode;
   private generatedContent: string = '';
   private activeFileAtOpen: TFile | null = null;
+  private usedPromptText: string = '';
+  private includePromptInInsert: boolean = false;
 
   constructor(app: App, plugin: OSBAPlugin) {
     super(app);
@@ -217,8 +219,20 @@ export class QuickDraftModal extends Modal {
     try {
       const result = await this.plugin.connectionAnalyzer.generateQuickDraft(prompt);
       this.generatedContent = result.content;
+      this.usedPromptText = prompt;
 
       this.resultContainer.empty();
+
+      // 요청 프롬프트 표시
+      const promptBlock = this.resultContainer.createDiv();
+      promptBlock.style.cssText = `
+        background: var(--background-secondary); 
+        border: 1px solid var(--background-modifier-border); 
+        border-radius: 6px; padding: 10px; margin-bottom: 10px;
+        max-height: 80px; overflow-y: auto;
+      `;
+      promptBlock.createEl('div', { text: '📋 요청 프롬프트' }).style.cssText = 'font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--text-muted);';
+      promptBlock.createEl('div', { text: this.usedPromptText }).style.cssText = 'font-size: 12px; color: var(--text-normal); white-space: pre-wrap;';
 
       if (result.relatedNotes.length > 0) {
         const relatedSection = this.resultContainer.createDiv({ cls: 'osba-related-notes' });
@@ -275,9 +289,21 @@ export class QuickDraftModal extends Modal {
         .setButtonText('📥 결과 삽입하기')
         .setCta()
         .onClick(async () => {
+          let output = this.generatedContent;
+          if (this.includePromptInInsert && this.usedPromptText) {
+            output = `> **📋 요청 프롬프트**\n> ${this.usedPromptText.replace(/\n/g, '\n> ')}\n\n---\n\n${output}`;
+          }
           this.close();
-          await this.handleInsertion(this.generatedContent);
+          await this.handleInsertion(output);
         });
+
+      // 프롬프트 포함 체크박스
+      const optionsRow = actionContainer.createDiv();
+      optionsRow.style.cssText = 'display: flex; align-items: center; gap: 4px;';
+      const cb = optionsRow.createEl('input', { type: 'checkbox' }) as HTMLInputElement;
+      cb.checked = this.includePromptInInsert;
+      cb.onchange = () => { this.includePromptInInsert = cb.checked; };
+      optionsRow.createEl('span', { text: '프롬프트 포함' }).style.cssText = 'font-size: 12px;';
 
       new ButtonComponent(actionContainer)
         .setButtonText('클립보드에 복사')

@@ -26,6 +26,8 @@ export class AIAssistantModal extends Modal {
     private viewMode: 'prompt' | 'result' = 'prompt';
     private aiOutput: string = '';
     private activeFileAtOpen: TFile | null = null;
+    private usedPromptText: string = '';
+    private includePromptInInsert: boolean = false;
 
     // UI Elements
     private contentContainer!: HTMLElement;
@@ -450,6 +452,19 @@ export class AIAssistantModal extends Modal {
                 text: '아래 텍스트를 직접 수정한 뒤 원하는 노트 위치에 삽입할 수 있습니다.',
                 cls: 'osba-modal-desc',
             }).style.margin = '0 0 10px 0';
+
+            // 요청 프롬프트 표시
+            if (this.usedPromptText) {
+                const promptBlock = container.createDiv();
+                promptBlock.style.cssText = `
+                    background: var(--background-secondary); 
+                    border: 1px solid var(--background-modifier-border); 
+                    border-radius: 6px; padding: 10px; margin-bottom: 10px;
+                    max-height: 100px; overflow-y: auto;
+                `;
+                promptBlock.createEl('div', { text: '📋 요청 프롬프트' }).style.cssText = 'font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--text-muted);';
+                promptBlock.createEl('div', { text: this.usedPromptText }).style.cssText = 'font-size: 12px; color: var(--text-normal); white-space: pre-wrap; word-break: break-word;';
+            }
         }
 
         const isCustom = this.activeTab === 'custom';
@@ -747,18 +762,33 @@ export class AIAssistantModal extends Modal {
                     this.onOpen();
                 });
 
+            // 프롬프트 포함 체크박스
+            if (this.usedPromptText) {
+                const checkboxRow = actionGroup.createDiv();
+                checkboxRow.style.cssText = 'display: flex; align-items: center; gap: 4px;';
+                const cb = checkboxRow.createEl('input', { type: 'checkbox' }) as HTMLInputElement;
+                cb.checked = this.includePromptInInsert;
+                cb.onchange = () => { this.includePromptInInsert = cb.checked; };
+                checkboxRow.createEl('span', { text: '프롬프트 포함' }).style.cssText = 'font-size: 12px;';
+            }
+
             new ButtonComponent(actionGroup)
                 .setButtonText('📥 결과 삽입하기')
                 .setCta()
                 .onClick(async () => {
+                    let output = this.aiOutput;
+                    if (this.includePromptInInsert && this.usedPromptText) {
+                        output = `> **📋 요청 프롬프트**\n> ${this.usedPromptText.replace(/\n/g, '\n> ')}\n\n---\n\n${output}`;
+                    }
                     this.close();
-                    await this.handleInsertion(this.aiOutput, this.activeFileAtOpen);
+                    await this.handleInsertion(output, this.activeFileAtOpen);
                 });
         }
     }
 
     private async executeAI() {
         this.isProcessing = true;
+        this.usedPromptText = this.promptText;
 
         let targetContent = '';
 
