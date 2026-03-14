@@ -164,36 +164,122 @@ export class AIAssistantModal extends Modal {
     private renderMultiSourceTypeList(container: HTMLElement) {
         container.createEl('h3', { text: '멀티 소스 분석 유형' }).style.margin = '0 0 10px 0';
 
-        const types: { id: MultiSourceAnalysisType; label: string; desc: string }[] = [
+        const listDiv = container.createDiv();
+        listDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto;';
+
+        // 1) 빌트인 3가지 유형
+        const builtinTypes: { id: MultiSourceAnalysisType; label: string; desc: string }[] = [
             { id: 'synthesis', label: '종합 분석', desc: '모든 소스를 융합하여 요약' },
             { id: 'basic', label: '기본 분석', desc: '소스간 핵심 내용 비교 분석' },
             { id: 'summary', label: '개별 요약', desc: '각 소스 요약 후 종합' },
-            { id: 'custom', label: '커스텀 분석', desc: '직접 작성한 지시사항 적용' },
         ];
 
-        const listDiv = container.createDiv();
-        listDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;';
-
-        types.forEach(type => {
+        builtinTypes.forEach(type => {
+            const isSelected = this.multiSourceType === type.id && !this.customPromptId;
             const row = listDiv.createDiv();
             row.style.cssText = `
-                padding: 10px; 
-                border-radius: 6px; 
-                cursor: pointer; 
-                border: 1px solid ${this.multiSourceType === type.id ? 'var(--interactive-accent)' : 'var(--background-modifier-border)'};
-                background: ${this.multiSourceType === type.id ? 'var(--background-modifier-hover)' : 'transparent'};
+                padding: 10px; border-radius: 6px; cursor: pointer; 
+                border: 1px solid ${isSelected ? 'var(--interactive-accent)' : 'var(--background-modifier-border)'};
+                background: ${isSelected ? 'var(--background-modifier-hover)' : 'transparent'};
                 transition: all 0.2s ease-in-out;
             `;
-
-            row.createDiv({ text: type.label, cls: 'template-name' }).style.cssText = 'font-weight: bold; margin-bottom: 4px;';
-            row.createDiv({ text: type.desc, cls: 'template-desc' }).style.cssText = 'font-size: 12px; color: var(--text-muted);';
-
+            row.createDiv({ text: type.label }).style.cssText = 'font-weight: bold; margin-bottom: 4px;';
+            row.createDiv({ text: type.desc }).style.cssText = 'font-size: 12px; color: var(--text-muted);';
             row.onclick = () => {
                 this.multiSourceType = type.id;
+                this.customPromptId = null;
                 this.updateMultiSourcePrompt();
                 this.onOpen();
             };
         });
+
+        // 2) 저장된 멀티소스 커스텀 프롬프트 버튼들
+        const msPrompts = (this.plugin.settings.savedPrompts || []).filter((p: SavedPrompt) => p.source === 'multi-source');
+        if (msPrompts.length > 0) {
+            const divider = listDiv.createDiv();
+            divider.style.cssText = 'margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--background-modifier-border);';
+            divider.createEl('span', { text: '💾 저장된 커스텀 분석' }).style.cssText = 'font-size: 12px; color: var(--text-muted); font-weight: 500;';
+
+            msPrompts.forEach((savedPrompt: SavedPrompt) => {
+                const isSelected = this.multiSourceType === 'custom' && this.customPromptId === savedPrompt.id;
+                const row = listDiv.createDiv();
+                row.style.cssText = `
+                    padding: 10px; border-radius: 6px; cursor: pointer;
+                    border: 1px solid ${isSelected ? 'var(--interactive-accent)' : 'var(--background-modifier-border)'};
+                    background: ${isSelected ? 'var(--background-modifier-hover)' : 'transparent'};
+                    transition: all 0.2s ease-in-out;
+                    display: flex; justify-content: space-between; align-items: center;
+                `;
+
+                const textDiv = row.createDiv();
+                textDiv.style.cssText = 'flex: 1; min-width: 0;';
+                textDiv.createDiv({ text: `💬 ${savedPrompt.name}` }).style.cssText = 'font-weight: bold; margin-bottom: 2px;';
+                if (savedPrompt.description) {
+                    textDiv.createDiv({ text: savedPrompt.description }).style.cssText = 'font-size: 11px; color: var(--text-muted);';
+                }
+
+                row.onclick = () => {
+                    this.multiSourceType = 'custom';
+                    this.customPromptId = savedPrompt.id;
+                    this.promptText = savedPrompt.prompt;
+                    this.onOpen();
+                };
+
+                const btnGroup = row.createDiv();
+                btnGroup.style.cssText = 'display: flex; gap: 4px; flex-shrink: 0;';
+
+                const editBtn = btnGroup.createEl('button', { text: '편집' });
+                editBtn.style.fontSize = '11px';
+                editBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    new PromptEditModal(this.app, async (name, description, promptBody) => {
+                        savedPrompt.name = name;
+                        savedPrompt.description = description;
+                        savedPrompt.prompt = promptBody;
+                        await this.plugin.saveSettings();
+                        new Notice('프롬프트가 수정되었습니다.');
+                        if (this.customPromptId === savedPrompt.id) {
+                            this.promptText = promptBody;
+                        }
+                        this.onOpen();
+                    }, savedPrompt).open();
+                };
+
+                const delBtn = btnGroup.createEl('button', { text: '삭제' });
+                delBtn.style.fontSize = '11px';
+                delBtn.onclick = async (e) => {
+                    e.stopPropagation();
+                    if (confirm(`'${savedPrompt.name}' 프롬프트를 삭제하시겠습니까?`)) {
+                        this.plugin.settings.savedPrompts = this.plugin.settings.savedPrompts.filter((p: SavedPrompt) => p.id !== savedPrompt.id);
+                        await this.plugin.saveSettings();
+                        if (this.customPromptId === savedPrompt.id) {
+                            this.customPromptId = null;
+                            this.promptText = '';
+                        }
+                        this.onOpen();
+                    }
+                };
+            });
+        }
+
+        // 3) "커스텀 프롬프트 추가" 버튼 (맨 마지막)
+        const addCustomRow = listDiv.createDiv();
+        const isNewCustomSelected = this.multiSourceType === 'custom' && !this.customPromptId;
+        addCustomRow.style.cssText = `
+            padding: 10px; border-radius: 6px; cursor: pointer;
+            border: 1px dashed ${isNewCustomSelected ? 'var(--interactive-accent)' : 'var(--background-modifier-border)'};
+            background: ${isNewCustomSelected ? 'var(--background-modifier-hover)' : 'transparent'};
+            transition: all 0.2s ease-in-out;
+            text-align: center; margin-top: 4px;
+        `;
+        addCustomRow.createDiv({ text: '+ 커스텀 프롬프트 추가' }).style.cssText = 'font-weight: bold; color: var(--text-muted);';
+        addCustomRow.createDiv({ text: '직접 작성한 지시사항으로 새 프롬프트 생성' }).style.cssText = 'font-size: 11px; color: var(--text-faint);';
+        addCustomRow.onclick = () => {
+            this.multiSourceType = 'custom';
+            this.customPromptId = null;
+            this.promptText = '';
+            this.onOpen();
+        };
     }
 
     private updateMultiSourcePrompt() {
