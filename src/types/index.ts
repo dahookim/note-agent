@@ -155,6 +155,22 @@ export interface SavedPrompt {
   prompt: string;
 }
 
+export interface SourceItem {
+  id: string;
+  type: 'obsidian-note' | 'manual-input';
+  title: string;
+  content: string;
+  metadata: {
+    charCount: number;
+    wordCount: number;
+    filePath?: string;
+    tags?: string[];
+  };
+  addedAt: string;
+}
+
+export type MultiSourceAnalysisType = 'synthesis' | 'basic' | 'summary' | 'custom';
+
 export type InsertionMode = 'new-note' | 'cursor' | 'end-of-note';
 
 // ============================================

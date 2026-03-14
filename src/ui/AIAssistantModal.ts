@@ -2,19 +2,24 @@ import { App, Modal, Setting, Notice, TextAreaComponent, DropdownComponent, Butt
 import { withProgressModal } from './progress-modal';
 import OSBAPlugin from '../main';
 import { ANALYSIS_TEMPLATES, TemplateType, getTemplateById, renderPrompt } from '../core/templates';
-import { InsertionMode, SavedPrompt } from '../types';
+import { InsertionMode, SavedPrompt, SourceItem, MultiSourceAnalysisType } from '../types';
+import { FileSuggestModal, TextInputModal } from './MultiSourceModals';
 
 export class AIAssistantModal extends Modal {
     private plugin: OSBAPlugin;
 
     // UI State
-    private activeTab: 'easy-gate' | 'stargate' | 'custom' = 'easy-gate';
+    private activeTab: 'easy-gate' | 'stargate' | 'custom' | 'multi-source' = 'easy-gate';
     private selectedTemplateId: string | null = null;
     private customPromptId: string | null = null;
     private promptText: string = '';
     private insertionMode: InsertionMode;
     private outputLanguage: string;
     private isProcessing: boolean = false;
+
+    // Multi-source State
+    private sources: SourceItem[] = [];
+    private multiSourceType: MultiSourceAnalysisType = 'synthesis';
 
     // Preview / Result State
     private viewMode: 'prompt' | 'result' = 'prompt';
@@ -35,6 +40,29 @@ export class AIAssistantModal extends Modal {
         // Default to first easy-gate template
         this.selectedTemplateId = 'basic-summary';
         this.updatePreviewText();
+
+        // Auto-add current file to multi-source if available
+        if (this.activeFileAtOpen) {
+            this.addActiveNoteToSources(this.activeFileAtOpen);
+        }
+    }
+
+    private async addActiveNoteToSources(file: TFile) {
+        const content = await this.app.vault.read(file);
+        const cache = this.app.metadataCache.getFileCache(file);
+        this.sources.push({
+            id: `source-${Date.now()}`,
+            type: 'obsidian-note',
+            title: file.basename,
+            content: content,
+            metadata: {
+                filePath: file.path,
+                tags: cache?.tags?.map(t => t.tag) || [],
+                charCount: content.length,
+                wordCount: content.split(/\s+/).filter(w => w).length
+            },
+            addedAt: new Date().toISOString()
+        });
     }
 
     onOpen() {
@@ -101,9 +129,10 @@ export class AIAssistantModal extends Modal {
                 // 각 탭별 기본 선택
                 if (id === 'easy-gate') this.selectedTemplateId = 'basic-summary';
                 else if (id === 'stargate') this.selectedTemplateId = 'briefing';
+                else if (id === 'multi-source') this.updateMultiSourcePrompt();
 
-                // 프롬프트 강제 동기화 (커스텀 탭이 아닌경우)
-                if (id !== 'custom') this.updatePreviewText();
+                // 프롬프트 강제 동기화 (커스텀 탭 및 멀티소스 탭이 아닌경우)
+                if (id !== 'custom' && id !== 'multi-source') this.updatePreviewText();
 
                 this.onOpen(); // 다시 렌더링
             };
@@ -112,6 +141,7 @@ export class AIAssistantModal extends Modal {
         createTab('easy-gate', 'Easy Gate (기본)');
         createTab('stargate', 'Stargate (심층)');
         createTab('custom', 'Custom (커스텀)');
+        createTab('multi-source', 'Multi-Source (멀티 소스)');
     }
 
     private renderTabContent() {
@@ -125,6 +155,56 @@ export class AIAssistantModal extends Modal {
             this.renderTemplateGrid(stargateTemplates);
         } else if (this.activeTab === 'custom') {
             this.renderCustomTab();
+        } else if (this.activeTab === 'multi-source') {
+            this.renderMultiSourceTypeList(this.contentContainer);
+        }
+    }
+
+    private renderMultiSourceTypeList(container: HTMLElement) {
+        container.createEl('h3', { text: '멀티 소스 분석 유형' }).style.margin = '0 0 10px 0';
+
+        const types: { id: MultiSourceAnalysisType; label: string; desc: string }[] = [
+            { id: 'synthesis', label: '종합 분석', desc: '모든 소스를 융합하여 요약' },
+            { id: 'basic', label: '기본 분석', desc: '소스간 핵심 내용 비교 분석' },
+            { id: 'summary', label: '개별 요약', desc: '각 소스 요약 후 종합' },
+            { id: 'custom', label: '커스텀 분석', desc: '직접 작성한 지시사항 적용' },
+        ];
+
+        const listDiv = container.createDiv();
+        listDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;';
+
+        types.forEach(type => {
+            const row = listDiv.createDiv();
+            row.style.cssText = `
+                padding: 10px; 
+                border-radius: 6px; 
+                cursor: pointer; 
+                border: 1px solid ${this.multiSourceType === type.id ? 'var(--interactive-accent)' : 'var(--background-modifier-border)'};
+                background: ${this.multiSourceType === type.id ? 'var(--background-modifier-hover)' : 'transparent'};
+                transition: all 0.2s ease-in-out;
+            `;
+
+            row.createDiv({ text: type.label, cls: 'template-name' }).style.cssText = 'font-weight: bold; margin-bottom: 4px;';
+            row.createDiv({ text: type.desc, cls: 'template-desc' }).style.cssText = 'font-size: 12px; color: var(--text-muted);';
+
+            row.onclick = () => {
+                this.multiSourceType = type.id;
+                this.updateMultiSourcePrompt();
+                this.onOpen();
+            };
+        });
+    }
+
+    private updateMultiSourcePrompt() {
+        if (this.multiSourceType === 'synthesis') this.promptText = '제공된 모든 자료의 내용을 종합하여 핵심 인사이트를 포함하는 통합 요약본을 작성해 주세요.';
+        else if (this.multiSourceType === 'basic') this.promptText = '각 자료의 핵심 주장을 파악하고 공통점과 차이점을 중심으로 비교 분석해 주세요.';
+        else if (this.multiSourceType === 'summary') this.promptText = '제공된 자료들을 각각 먼저 3줄로 요약한 뒤, 전체 자료들을 아우르는 결론을 도출해 주세요.';
+        else if (this.multiSourceType === 'custom') {
+            if (this.promptText === '제공된 모든 자료의 내용을 종합하여 핵심 인사이트를 포함하는 통합 요약본을 작성해 주세요.' ||
+                this.promptText === '각 자료의 핵심 주장을 파악하고 공통점과 차이점을 중심으로 비교 분석해 주세요.' ||
+                this.promptText === '제공된 자료들을 각각 먼저 3줄로 요약한 뒤, 전체 자료들을 아우르는 결론을 도출해 주세요.') {
+                this.promptText = '';
+            }
         }
     }
 
@@ -242,6 +322,11 @@ export class AIAssistantModal extends Modal {
     }
 
     private renderRightPanel(container: HTMLElement) {
+        if (this.activeTab === 'multi-source' && this.viewMode === 'prompt') {
+            this.renderMultiSourceRightPanel(container);
+            return;
+        }
+
         const isPromptMode = this.viewMode === 'prompt';
         const headerText = isPromptMode ? '👁️ 프롬프트 미리보기' : '✨ AI 생성 결과 (편집 가능)';
         container.createEl('h3', { text: headerText }).style.margin = '0 0 5px 0';
@@ -290,6 +375,149 @@ export class AIAssistantModal extends Modal {
 
         // "Custom" 탭이고 현재 작성중인 프롬프트가 있으면 저장 버튼 스니펫 
         if (isPromptMode && isCustom) {
+            const saveRow = container.createDiv();
+            saveRow.style.cssText = 'display: flex; justify-content: flex-end; margin-top: 5px;';
+
+            new ButtonComponent(saveRow)
+                .setButtonText(this.customPromptId ? '💾 덮어쓰기 저장' : '💾 새 프롬프트 저장')
+                .onClick(async () => {
+                    if (!this.promptText.trim()) {
+                        new Notice('프롬프트 내용이 비어있습니다.');
+                        return;
+                    }
+
+                    if (this.customPromptId) {
+                        // 기존 프롬프트 업데이트
+                        const existing = this.plugin.settings.savedPrompts.find((p: SavedPrompt) => p.id === this.customPromptId);
+                        if (existing) {
+                            existing.prompt = this.promptText;
+                            await this.plugin.saveSettings();
+                            new Notice('프롬프트가 수정되었습니다.');
+                            this.onOpen();
+                            return;
+                        }
+                    }
+
+                    // 새 프롬프트
+                    const name = prompt('프롬프트 이름을 입력하세요:');
+                    if (name) {
+                        const newPrompt: SavedPrompt = {
+                            id: `custom-${Date.now()}`,
+                            name,
+                            prompt: this.promptText
+                        };
+                        if (!this.plugin.settings.savedPrompts) {
+                            this.plugin.settings.savedPrompts = [];
+                        }
+                        this.plugin.settings.savedPrompts.push(newPrompt);
+                        await this.plugin.saveSettings();
+                        this.customPromptId = newPrompt.id;
+                        new Notice('새 프롬프트가 저장되었습니다.');
+                        this.onOpen();
+                    }
+                });
+        }
+    }
+
+    private renderMultiSourceRightPanel(container: HTMLElement) {
+        // Source Manager UI
+        const sourceManagerContainer = container.createDiv({ cls: 'source-manager-section' });
+        sourceManagerContainer.style.cssText = `
+            background: var(--background-secondary);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 15px;
+        `;
+
+        const headerRow = sourceManagerContainer.createDiv();
+        headerRow.style.cssText = `display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;`;
+        headerRow.createEl('strong', { text: '📚 참조 소스' });
+
+        const addButtonsRow = headerRow.createDiv();
+        addButtonsRow.style.cssText = `display: flex; gap: 8px;`;
+
+        const addNoteBtn = addButtonsRow.createEl('button', { text: '📄 노트 추가' });
+        addNoteBtn.style.padding = '4px 8px';
+        addNoteBtn.onclick = () => {
+            new FileSuggestModal(this.app, async (file: TFile) => {
+                await this.addActiveNoteToSources(file);
+                this.onOpen();
+                new Notice(`노트 추가됨: ${file.basename}`);
+            }).open();
+        };
+
+        const addTextBtn = addButtonsRow.createEl('button', { text: '✏️ 텍스트 추가' });
+        addTextBtn.style.padding = '4px 8px';
+        addTextBtn.onclick = () => {
+            new TextInputModal(this.app, (title, content) => {
+                this.sources.push({
+                    id: `source-${Date.now()}`,
+                    type: 'manual-input',
+                    title,
+                    content,
+                    metadata: {
+                        charCount: content.length,
+                        wordCount: content.split(/\s+/).filter(w => w).length
+                    },
+                    addedAt: new Date().toISOString()
+                });
+                this.onOpen();
+                new Notice(`텍스트 추가됨: ${title}`);
+            }).open();
+        };
+
+        const listDiv = sourceManagerContainer.createDiv();
+        listDiv.style.cssText = `max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;`;
+
+        if (this.sources.length === 0) {
+            listDiv.createEl('p', { text: '추가된 소스가 없습니다. 위 버튼을 눌러 소스를 추가해주세요.', cls: 'empty-state-text' })
+                .style.cssText = 'color: var(--text-muted); font-size: 12px; margin: 5px 0; text-align: center;';
+        } else {
+            this.sources.forEach((source, index) => {
+                const itemDiv = listDiv.createDiv();
+                itemDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: var(--background-primary); border-radius: 4px; border: 1px solid var(--background-modifier-border);';
+
+                const infoDiv = itemDiv.createDiv();
+                infoDiv.createSpan({ text: source.type === 'obsidian-note' ? '📄 ' : '📝 ' });
+                infoDiv.createSpan({ text: source.title }).style.fontWeight = '500';
+                infoDiv.createSpan({ text: ` (${source.metadata.charCount.toLocaleString()}자)` }).style.cssText = 'font-size: 11px; color: var(--text-muted);';
+
+                const deleteBtn = itemDiv.createEl('button', { text: '🗑️' });
+                deleteBtn.style.cssText = 'background: transparent; border: none; padding: 2px 5px; cursor: pointer;';
+                deleteBtn.onclick = () => {
+                    this.sources.splice(index, 1);
+                    this.onOpen();
+                };
+            });
+        }
+
+        // Custom Prompt Entry
+        container.createEl('h3', { text: '💬 분석 지시사항' }).style.margin = '0 0 5px 0';
+        const textAreaSetting = new Setting(container)
+            .setClass('assistant-preview-setting')
+            .addTextArea(text => {
+                this.previewTextArea = text;
+                text.setValue(this.promptText);
+                text.inputEl.style.cssText = `
+                    width: 100%;
+                    min-height: 120px;
+                    resize: vertical;
+                    font-size: 13px;
+                `;
+                if (this.multiSourceType !== 'custom') {
+                    text.setDisabled(true);
+                } else {
+                    text.setPlaceholder('커스텀 분석 지시사항을 작성하세요...');
+                    text.onChange(value => {
+                        this.promptText = value;
+                    });
+                }
+            });
+        textAreaSetting.settingEl.style.border = 'none';
+        textAreaSetting.settingEl.style.padding = '0';
+
+        // Saving logic for Multi-source custom instruction (matches custom tab)
+        if (this.multiSourceType === 'custom') {
             const saveRow = container.createDiv();
             saveRow.style.cssText = 'display: flex; justify-content: flex-end; margin-top: 5px;';
 
@@ -420,23 +648,31 @@ export class AIAssistantModal extends Modal {
 
         let targetContent = '';
 
-        // 1. 현재 에디터 내용 혹은 노트 내용 가져오기
-        const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (this.activeTab === 'multi-source') {
+            if (this.sources.length === 0) {
+                new Notice('분석할 소스가 없습니다. 패널에서 소스를 추가해 주세요.');
+                this.isProcessing = false;
+                return;
+            }
+            // 모든 소스들을 마크다운 형식으로 병합
+            targetContent = this.sources.map((s, idx) => `### Source [${idx + 1}]: ${s.title}\n${s.content}\n`).join('\n---\n');
+        } else {
+            // 기존 단일 파일/선택영역 모드
+            // 1. 현재 에디터 내용 혹은 노트 내용 가져오기
+            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+            const activeFile = this.app.workspace.getActiveFile();
 
-        const activeFile = this.app.workspace.getActiveFile();
+            if (activeView && (activeView as any).editor) {
+                targetContent = (activeView as any).editor.getSelection();
+            }
 
-        if (activeView && (activeView as any).editor) {
-            // 선택된 텍스트가 있으면 그것을 컨텍스트로 사용
-            targetContent = (activeView as any).editor.getSelection();
-        }
+            if (!targetContent && activeFile) {
+                targetContent = await this.app.vault.read(activeFile);
+            }
 
-        if (!targetContent && activeFile) {
-            // 선택 내역이 없으면 현재 파일 전체 내용 읽기
-            targetContent = await this.app.vault.read(activeFile);
-        }
-
-        if (!targetContent.trim()) {
-            new Notice('참조할 내용(선택된 텍스트 혹은 노트 내용)이 발견되지 않았습니다. 기본 상태에서 메타 분석을 시작합니다.');
+            if (!targetContent.trim()) {
+                new Notice('참조할 내용(선택된 텍스트 혹은 노트 내용)이 발견되지 않았습니다. 기본 상태에서 메타 분석을 시작합니다.');
+            }
         }
 
         // 프롬프트 구성
