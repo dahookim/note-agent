@@ -152,6 +152,7 @@ export interface CustomAPIModel {
 export interface SavedPrompt {
   id: string;
   name: string;
+  description?: string;
   prompt: string;
 }
 

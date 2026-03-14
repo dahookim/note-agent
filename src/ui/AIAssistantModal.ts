@@ -4,6 +4,7 @@ import OSBAPlugin from '../main';
 import { ANALYSIS_TEMPLATES, TemplateType, getTemplateById, renderPrompt } from '../core/templates';
 import { InsertionMode, SavedPrompt, SourceItem, MultiSourceAnalysisType } from '../types';
 import { FileSuggestModal, TextInputModal } from './MultiSourceModals';
+import { PromptEditModal } from './PromptEditModal';
 
 export class AIAssistantModal extends Modal {
     private plugin: OSBAPlugin;
@@ -266,7 +267,7 @@ export class AIAssistantModal extends Modal {
         if (!this.plugin.settings.savedPrompts || this.plugin.settings.savedPrompts.length === 0) {
             listContainer.createEl('p', { text: '저장된 커스텀 프롬프트가 없습니다.', cls: 'osba-modal-desc' });
         } else {
-            this.plugin.settings.savedPrompts.forEach((prompt: SavedPrompt) => {
+            this.plugin.settings.savedPrompts.forEach((savedPrompt: SavedPrompt) => {
                 const item = listContainer.createDiv();
                 item.style.cssText = `
                     display: flex; justify-content: space-between; align-items: center; 
@@ -274,33 +275,56 @@ export class AIAssistantModal extends Modal {
                     border-radius: 6px; cursor: pointer;
                 `;
 
-                if (this.customPromptId === prompt.id) {
+                if (this.customPromptId === savedPrompt.id) {
                     item.style.borderColor = 'var(--interactive-accent)';
                     item.style.background = 'var(--background-secondary)';
                 }
 
-                item.createSpan({ text: `💬 ${prompt.name}`, cls: 'prompt-title' });
+                const textDiv = item.createDiv();
+                textDiv.style.cssText = 'flex: 1; min-width: 0;';
+                textDiv.createDiv({ text: `💬 ${savedPrompt.name}` }).style.fontWeight = '500';
+                if (savedPrompt.description) {
+                    textDiv.createDiv({ text: savedPrompt.description }).style.cssText = 'font-size: 11px; color: var(--text-muted); margin-top: 2px;';
+                }
 
                 const btnGroup = item.createDiv();
-                btnGroup.style.display = 'flex';
-                btnGroup.style.gap = '4px';
+                btnGroup.style.cssText = 'display: flex; gap: 4px; flex-shrink: 0;';
 
                 const applyBtn = btnGroup.createEl('button', { text: '적용' });
+                applyBtn.style.fontSize = '12px';
                 applyBtn.onclick = (e) => {
                     e.stopPropagation();
-                    this.customPromptId = prompt.id;
-                    this.promptText = prompt.prompt;
+                    this.customPromptId = savedPrompt.id;
+                    this.promptText = savedPrompt.prompt;
                     this.selectedTemplateId = 'custom';
                     this.onOpen();
                 };
 
+                const editBtn = btnGroup.createEl('button', { text: '편집' });
+                editBtn.style.fontSize = '12px';
+                editBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    new PromptEditModal(this.app, async (name, description, promptBody) => {
+                        savedPrompt.name = name;
+                        savedPrompt.description = description;
+                        savedPrompt.prompt = promptBody;
+                        await this.plugin.saveSettings();
+                        new Notice('프롬프트가 수정되었습니다.');
+                        if (this.customPromptId === savedPrompt.id) {
+                            this.promptText = promptBody;
+                        }
+                        this.onOpen();
+                    }, savedPrompt).open();
+                };
+
                 const delBtn = btnGroup.createEl('button', { text: '삭제' });
+                delBtn.style.fontSize = '12px';
                 delBtn.onclick = async (e) => {
                     e.stopPropagation();
-                    if (confirm(`'${prompt.name}' 프롬프트를 삭제하시겠습니까?`)) {
-                        this.plugin.settings.savedPrompts = this.plugin.settings.savedPrompts.filter((p: SavedPrompt) => p.id !== prompt.id);
+                    if (confirm(`'${savedPrompt.name}' 프롬프트를 삭제하시겠습니까?`)) {
+                        this.plugin.settings.savedPrompts = this.plugin.settings.savedPrompts.filter((p: SavedPrompt) => p.id !== savedPrompt.id);
                         await this.plugin.saveSettings();
-                        if (this.customPromptId === prompt.id) {
+                        if (this.customPromptId === savedPrompt.id) {
                             this.customPromptId = null;
                             this.promptText = '';
                         }
@@ -387,7 +411,6 @@ export class AIAssistantModal extends Modal {
                     }
 
                     if (this.customPromptId) {
-                        // 기존 프롬프트 업데이트
                         const existing = this.plugin.settings.savedPrompts.find((p: SavedPrompt) => p.id === this.customPromptId);
                         if (existing) {
                             existing.prompt = this.promptText;
@@ -398,13 +421,13 @@ export class AIAssistantModal extends Modal {
                         }
                     }
 
-                    // 새 프롬프트
-                    const name = prompt('프롬프트 이름을 입력하세요:');
-                    if (name) {
+                    // 새 프롬프트 — PromptEditModal 사용
+                    new PromptEditModal(this.app, async (name, description, promptBody) => {
                         const newPrompt: SavedPrompt = {
                             id: `custom-${Date.now()}`,
                             name,
-                            prompt: this.promptText
+                            description: description || undefined,
+                            prompt: promptBody
                         };
                         if (!this.plugin.settings.savedPrompts) {
                             this.plugin.settings.savedPrompts = [];
@@ -414,7 +437,7 @@ export class AIAssistantModal extends Modal {
                         this.customPromptId = newPrompt.id;
                         new Notice('새 프롬프트가 저장되었습니다.');
                         this.onOpen();
-                    }
+                    }, { id: '', name: '', description: '', prompt: this.promptText }).open();
                 });
         }
     }
@@ -516,7 +539,7 @@ export class AIAssistantModal extends Modal {
         textAreaSetting.settingEl.style.border = 'none';
         textAreaSetting.settingEl.style.padding = '0';
 
-        // Saving logic for Multi-source custom instruction (matches custom tab)
+        // Saving logic for Multi-source custom instruction
         if (this.multiSourceType === 'custom') {
             const saveRow = container.createDiv();
             saveRow.style.cssText = 'display: flex; justify-content: flex-end; margin-top: 5px;';
@@ -530,7 +553,6 @@ export class AIAssistantModal extends Modal {
                     }
 
                     if (this.customPromptId) {
-                        // 기존 프롬프트 업데이트
                         const existing = this.plugin.settings.savedPrompts.find((p: SavedPrompt) => p.id === this.customPromptId);
                         if (existing) {
                             existing.prompt = this.promptText;
@@ -541,13 +563,13 @@ export class AIAssistantModal extends Modal {
                         }
                     }
 
-                    // 새 프롬프트
-                    const name = prompt('프롬프트 이름을 입력하세요:');
-                    if (name) {
+                    // 새 프롬프트 — PromptEditModal 사용
+                    new PromptEditModal(this.app, async (name, description, promptBody) => {
                         const newPrompt: SavedPrompt = {
                             id: `custom-${Date.now()}`,
                             name,
-                            prompt: this.promptText
+                            description: description || undefined,
+                            prompt: promptBody
                         };
                         if (!this.plugin.settings.savedPrompts) {
                             this.plugin.settings.savedPrompts = [];
@@ -557,7 +579,7 @@ export class AIAssistantModal extends Modal {
                         this.customPromptId = newPrompt.id;
                         new Notice('새 프롬프트가 저장되었습니다.');
                         this.onOpen();
-                    }
+                    }, { id: '', name: '', description: '', prompt: this.promptText }).open();
                 });
         }
     }

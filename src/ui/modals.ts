@@ -12,10 +12,11 @@ import {
   TFile,
   MarkdownRenderer,
   ButtonComponent,
-  MarkdownView
+  MarkdownView,
+  DropdownComponent
 } from 'obsidian';
 import type OSBAPlugin from '../main';
-import { AnalysisResult, SearchResult } from '../types';
+import { AnalysisResult, SearchResult, InsertionMode } from '../types';
 import { AIAssistantModal } from './AIAssistantModal';
 
 // ============================================
@@ -147,10 +148,15 @@ export class QuickDraftModal extends Modal {
   private promptInput!: TextAreaComponent;
   private resultContainer!: HTMLElement;
   private isProcessing: boolean = false;
+  private insertionMode: InsertionMode;
+  private generatedContent: string = '';
+  private activeFileAtOpen: TFile | null = null;
 
   constructor(app: App, plugin: OSBAPlugin) {
     super(app);
     this.plugin = plugin;
+    this.insertionMode = this.plugin.settings.defaultInsertionMode || 'new-note';
+    this.activeFileAtOpen = this.app.workspace.getActiveFile();
   }
 
   onOpen() {
@@ -158,14 +164,12 @@ export class QuickDraftModal extends Modal {
     contentEl.empty();
     contentEl.addClass('osba-modal');
 
-    // 헤더
     contentEl.createEl('h2', { text: '✨ Quick Draft' });
     contentEl.createEl('p', {
       text: '관련 노트의 컨텍스트를 활용하여 새로운 콘텐츠를 작성합니다.',
       cls: 'osba-modal-desc',
     });
 
-    // 프롬프트 입력
     new Setting(contentEl)
       .setName('작성 요청')
       .setDesc('어떤 내용을 작성할지 설명해주세요')
@@ -204,9 +208,7 @@ export class QuickDraftModal extends Modal {
       return;
     }
 
-    if (this.isProcessing) {
-      return;
-    }
+    if (this.isProcessing) return;
 
     this.isProcessing = true;
     this.resultContainer.empty();
@@ -214,62 +216,74 @@ export class QuickDraftModal extends Modal {
 
     try {
       const result = await this.plugin.connectionAnalyzer.generateQuickDraft(prompt);
+      this.generatedContent = result.content;
 
       this.resultContainer.empty();
 
-      // 관련 노트 표시
       if (result.relatedNotes.length > 0) {
         const relatedSection = this.resultContainer.createDiv({ cls: 'osba-related-notes' });
         relatedSection.createEl('h4', { text: '📚 참조된 노트' });
-
         const noteList = relatedSection.createEl('ul');
         for (const notePath of result.relatedNotes.slice(0, 5)) {
           const li = noteList.createEl('li');
-          li.createEl('a', {
-            text: notePath,
-            href: notePath,
-            cls: 'internal-link',
-          });
+          li.createEl('a', { text: notePath, href: notePath, cls: 'internal-link' });
         }
       }
 
-      // 결과 표시
       const resultSection = this.resultContainer.createDiv({ cls: 'osba-draft-result' });
-      resultSection.createEl('h4', { text: '📝 생성된 초안' });
+      resultSection.createEl('h4', { text: '✨ 생성된 초안 (편집 가능)' });
 
-      const previewEl = resultSection.createDiv({ cls: 'osba-markdown-preview' });
-      await MarkdownRenderer.renderMarkdown(
-        result.content,
-        previewEl,
-        '',
-        null as any
-      );
+      // 편집 가능한 텍스트 에리어
+      const editArea = resultSection.createEl('textarea');
+      editArea.value = result.content;
+      editArea.style.cssText = `
+        width: 100%;
+        min-height: 250px;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid var(--background-modifier-border);
+        background: var(--background-primary);
+        font-size: 13px;
+        line-height: 1.5;
+        resize: vertical;
+      `;
+      editArea.oninput = () => {
+        this.generatedContent = editArea.value;
+      };
 
-      // 비용 표시
       const costEl = resultSection.createEl('p', { cls: 'osba-cost' });
       costEl.setText(`💰 비용: $${result.cost.toFixed(4)}`);
 
-      // 액션 버튼
+      // Insert Options
+      const insertOptionsRow = resultSection.createDiv();
+      insertOptionsRow.style.cssText = 'display: flex; align-items: center; gap: 10px; margin-top: 10px;';
+      insertOptionsRow.createSpan({ text: '삽입 위치:' }).style.fontWeight = '500';
+
+      const dropdown = new DropdownComponent(insertOptionsRow);
+      dropdown.addOption('new-note', '📄 새 노트 생성');
+      dropdown.addOption('cursor', '📍 현재 커서 위치');
+      dropdown.addOption('end-of-note', '⬇️ 현재 노트 맨 끝');
+      dropdown.setValue(this.insertionMode);
+      dropdown.onChange((val: string) => {
+        this.insertionMode = val as InsertionMode;
+      });
+
       const actionContainer = resultSection.createDiv({ cls: 'osba-action-buttons' });
+      actionContainer.style.cssText = 'display: flex; gap: 10px; margin-top: 12px;';
 
       new ButtonComponent(actionContainer)
-        .setButtonText('새 노트로 저장')
+        .setButtonText('📥 결과 삽입하기')
         .setCta()
         .onClick(async () => {
-          await this.saveAsNewNote(result.content);
+          this.close();
+          await this.handleInsertion(this.generatedContent);
         });
 
       new ButtonComponent(actionContainer)
         .setButtonText('클립보드에 복사')
         .onClick(async () => {
-          await navigator.clipboard.writeText(result.content);
+          await navigator.clipboard.writeText(this.generatedContent);
           new Notice('클립보드에 복사되었습니다.');
-        });
-
-      new ButtonComponent(actionContainer)
-        .setButtonText('현재 노트에 삽입')
-        .onClick(async () => {
-          await this.insertToActiveNote(result.content);
         });
 
     } catch (error) {
@@ -283,50 +297,31 @@ export class QuickDraftModal extends Modal {
     }
   }
 
-  private async saveAsNewNote(content: string) {
-    try {
-      // 제목 추출 또는 생성
-      const firstLine = content.split('\n')[0];
-      let title = firstLine.replace(/^#*\s*/, '').trim();
-
-      // Sanitize title: remove illegal characters for filenames
-      // Windows/Mac illegal chars: \ / : * ? " < > |
-      title = title.replace(/[\\/:*?"<>|]/g, '');
-
-      if (!title) {
-        title = `Quick Draft ${new Date().toISOString().slice(0, 10)}`;
-      }
-
-      const fileName = `${title}.md`;
-      const file = await this.app.vault.create(fileName, content);
-
-      new Notice(`새 노트가 생성되었습니다: ${fileName}`);
+  private async handleInsertion(output: string) {
+    if (this.insertionMode === 'new-note') {
+      const firstLine = output.split('\n')[0];
+      let title = firstLine.replace(/^#*\s*/, '').trim().replace(/[\\/:*?"<>|]/g, '');
+      if (!title) title = `Quick Draft ${new Date().toISOString().slice(0, 10)}`;
+      const file = await this.app.vault.create(`${title}.md`, output);
       this.app.workspace.openLinkText(file.path, '', true);
-      this.close();
-
-    } catch (error) {
-      new Notice(`노트 생성 실패: ${error}`);
-    }
-  }
-
-  private async insertToActiveNote(content: string) {
-    const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-
-    const activeFile = this.app.workspace.getActiveFile();
-    if (!activeFile) {
-      new Notice('활성화된 노트가 없습니다.');
-      return;
-    }
-
-    try {
-      const currentContent = await this.app.vault.read(activeFile);
-      const newContent = currentContent + '\n\n' + content;
-      await this.app.vault.modify(activeFile, newContent);
-      new Notice('내용이 삽입되었습니다.');
-      this.close();
-
-    } catch (error) {
-      new Notice(`삽입 실패: ${error}`);
+    } else if (this.insertionMode === 'cursor') {
+      const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+      if (activeView && (activeView as any).editor) {
+        const cursor = (activeView as any).editor.getCursor();
+        (activeView as any).editor.replaceRange(`\n\n${output}\n\n`, cursor);
+      } else {
+        new Notice('현재 활성화된 에디터가 없습니다. 새 노트로 생성합니다.');
+        await this.handleInsertion(output);
+      }
+    } else if (this.insertionMode === 'end-of-note') {
+      if (this.activeFileAtOpen) {
+        const content = await this.app.vault.read(this.activeFileAtOpen);
+        await this.app.vault.modify(this.activeFileAtOpen, content + `\n\n---\n\n## Quick Draft\n\n${output}\n`);
+      } else {
+        new Notice('현재 활성화된 노트가 없습니다. 새 노트로 생성합니다.');
+        this.insertionMode = 'new-note';
+        await this.handleInsertion(output);
+      }
     }
   }
 
@@ -344,12 +339,14 @@ export class AnalysisResultModal extends Modal {
   private plugin: OSBAPlugin;
   private result: AnalysisResult;
   private file: TFile;
+  private insertionMode: InsertionMode;
 
   constructor(app: App, plugin: OSBAPlugin, result: AnalysisResult, file: TFile) {
     super(app);
     this.plugin = plugin;
     this.result = result;
     this.file = file;
+    this.insertionMode = this.plugin.settings.defaultInsertionMode || 'new-note';
   }
 
   onOpen() {
@@ -357,65 +354,40 @@ export class AnalysisResultModal extends Modal {
     contentEl.empty();
     contentEl.addClass('osba-modal');
 
-    // 헤더
     contentEl.createEl('h2', { text: `📊 분석 결과: ${this.file.basename}` });
 
-    // 비용 정보
     const costEl = contentEl.createEl('p', { cls: 'osba-cost' });
     costEl.setText(`💰 분석 비용: $${this.result.cost.toFixed(4)}`);
 
-    // 연결 섹션
     if (this.result.connections.length > 0) {
       const connSection = contentEl.createDiv({ cls: 'osba-section' });
       connSection.createEl('h3', { text: '🔗 발견된 연결' });
-
       const connList = connSection.createEl('div', { cls: 'osba-connection-list' });
 
       for (const conn of this.result.connections) {
         const connItem = connList.createDiv({ cls: 'osba-connection-item' });
-
-        // 관계 타입 아이콘
         const typeIcon = this.getRelationTypeIcon(conn.relationType);
         const header = connItem.createDiv({ cls: 'osba-connection-header' });
-
         header.createEl('span', { text: typeIcon, cls: 'osba-relation-icon' });
-        header.createEl('a', {
-          text: conn.targetPath,
-          href: conn.targetPath,
-          cls: 'internal-link',
-        });
-        header.createEl('span', {
-          text: `(${(conn.confidence * 100).toFixed(0)}%)`,
-          cls: 'osba-confidence',
-        });
-
-        connItem.createEl('p', {
-          text: conn.reasoning,
-          cls: 'osba-reasoning',
-        });
+        header.createEl('a', { text: conn.targetPath, href: conn.targetPath, cls: 'internal-link' });
+        header.createEl('span', { text: `(${(conn.confidence * 100).toFixed(0)}%)`, cls: 'osba-confidence' });
+        connItem.createEl('p', { text: conn.reasoning, cls: 'osba-reasoning' });
       }
     } else {
       contentEl.createEl('p', { text: '발견된 연결이 없습니다.' });
     }
 
-    // 지식 갭 섹션
     if (this.result.gaps.length > 0) {
       const gapSection = contentEl.createDiv({ cls: 'osba-section' });
       gapSection.createEl('h3', { text: '🔍 지식 갭' });
-
       const gapList = gapSection.createEl('div', { cls: 'osba-gap-list' });
-
       for (const gap of this.result.gaps) {
         const gapItem = gapList.createDiv({ cls: 'osba-gap-item' });
-
         const priorityIcon = this.getPriorityIcon(gap.priority);
         const header = gapItem.createDiv({ cls: 'osba-gap-header' });
-
         header.createEl('span', { text: priorityIcon });
         header.createEl('strong', { text: gap.topic });
-
         gapItem.createEl('p', { text: gap.description });
-
         if (gap.suggestedResources && gap.suggestedResources.length > 0) {
           const resourceList = gapItem.createEl('ul', { cls: 'osba-resources' });
           for (const resource of gap.suggestedResources) {
@@ -425,18 +397,94 @@ export class AnalysisResultModal extends Modal {
       }
     }
 
-    // 인사이트 섹션
     if (this.result.insights) {
       const insightSection = contentEl.createDiv({ cls: 'osba-section' });
       insightSection.createEl('h3', { text: '💡 인사이트' });
       insightSection.createEl('p', { text: this.result.insights });
     }
 
-    // 닫기 버튼
-    const buttonContainer = contentEl.createDiv({ cls: 'osba-button-container' });
-    new ButtonComponent(buttonContainer)
+    // 결과 내보내기 (Insert)
+    contentEl.createEl('hr', { cls: 'osba-divider' });
+    const exportSection = contentEl.createDiv();
+    exportSection.style.marginTop = '10px';
+    exportSection.createEl('h3', { text: '📥 결과 내보내기' });
+
+    const insertOptionsRow = exportSection.createDiv();
+    insertOptionsRow.style.cssText = 'display: flex; align-items: center; gap: 10px; margin-bottom: 10px;';
+    insertOptionsRow.createSpan({ text: '삽입 위치:' }).style.fontWeight = '500';
+
+    const dropdown = new DropdownComponent(insertOptionsRow);
+    dropdown.addOption('new-note', '📄 새 노트 생성');
+    dropdown.addOption('cursor', '📍 현재 커서 위치');
+    dropdown.addOption('end-of-note', '⬇️ 현재 노트 맨 끝');
+    dropdown.setValue(this.insertionMode);
+    dropdown.onChange((val: string) => {
+      this.insertionMode = val as InsertionMode;
+    });
+
+    const actionContainer = exportSection.createDiv({ cls: 'osba-action-buttons' });
+    actionContainer.style.cssText = 'display: flex; gap: 10px;';
+
+    new ButtonComponent(actionContainer)
+      .setButtonText('📥 결과 삽입하기')
+      .setCta()
+      .onClick(async () => {
+        const exportText = this.buildExportText();
+        this.close();
+        await this.handleInsertion(exportText);
+      });
+
+    new ButtonComponent(actionContainer)
       .setButtonText('닫기')
       .onClick(() => this.close());
+  }
+
+  private buildExportText(): string {
+    let text = `# 분석 결과: ${this.file.basename}\n\n`;
+    if (this.result.connections.length > 0) {
+      text += `## 🔗 발견된 연결\n`;
+      for (const conn of this.result.connections) {
+        text += `- **${conn.targetPath}** (${(conn.confidence * 100).toFixed(0)}%) - ${conn.reasoning}\n`;
+      }
+      text += '\n';
+    }
+    if (this.result.gaps.length > 0) {
+      text += `## 🔍 지식 갭\n`;
+      for (const gap of this.result.gaps) {
+        text += `- **${gap.topic}**: ${gap.description}\n`;
+      }
+      text += '\n';
+    }
+    if (this.result.insights) {
+      text += `## 💡 인사이트\n${this.result.insights}\n`;
+    }
+    return text;
+  }
+
+  private async handleInsertion(output: string) {
+    if (this.insertionMode === 'new-note') {
+      let title = `분석 결과 - ${this.file.basename}`.replace(/[\\/:*?"<>|]/g, '');
+      const file = await this.app.vault.create(`${title}.md`, output);
+      this.app.workspace.openLinkText(file.path, '', true);
+    } else if (this.insertionMode === 'cursor') {
+      const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+      if (activeView && (activeView as any).editor) {
+        const cursor = (activeView as any).editor.getCursor();
+        (activeView as any).editor.replaceRange(`\n\n${output}\n\n`, cursor);
+      } else {
+        this.insertionMode = 'new-note';
+        await this.handleInsertion(output);
+      }
+    } else if (this.insertionMode === 'end-of-note') {
+      const activeFile = this.app.workspace.getActiveFile();
+      if (activeFile) {
+        const content = await this.app.vault.read(activeFile);
+        await this.app.vault.modify(activeFile, content + `\n\n---\n\n${output}\n`);
+      } else {
+        this.insertionMode = 'new-note';
+        await this.handleInsertion(output);
+      }
+    }
   }
 
   private getRelationTypeIcon(type: string): string {
@@ -473,12 +521,14 @@ export class SimilarNotesModal extends Modal {
   private plugin: OSBAPlugin;
   private results: SearchResult[];
   private sourceFile: TFile;
+  private insertionMode: InsertionMode;
 
   constructor(app: App, plugin: OSBAPlugin, results: SearchResult[], sourceFile: TFile) {
     super(app);
     this.plugin = plugin;
     this.results = results;
     this.sourceFile = sourceFile;
+    this.insertionMode = this.plugin.settings.defaultInsertionMode || 'new-note';
   }
 
   onOpen() {
@@ -486,7 +536,6 @@ export class SimilarNotesModal extends Modal {
     contentEl.empty();
     contentEl.addClass('osba-modal');
 
-    // 헤더
     contentEl.createEl('h2', { text: `🔍 유사한 노트: ${this.sourceFile.basename}` });
 
     if (this.results.length === 0) {
@@ -494,48 +543,97 @@ export class SimilarNotesModal extends Modal {
       return;
     }
 
-    // 결과 목록
     const resultList = contentEl.createDiv({ cls: 'osba-similar-list' });
 
     for (const result of this.results) {
       const item = resultList.createDiv({ cls: 'osba-similar-item' });
-
-      // 유사도 바
       const similarity = result.similarity;
       const similarityPercent = (similarity * 100).toFixed(1);
 
       const header = item.createDiv({ cls: 'osba-similar-header' });
+      header.createEl('a', { text: result.title, href: result.notePath, cls: 'internal-link' });
+      header.createEl('span', { text: `${similarityPercent}%`, cls: 'osba-similarity-badge' });
 
-      header.createEl('a', {
-        text: result.title,
-        href: result.notePath,
-        cls: 'internal-link',
-      });
-
-      header.createEl('span', {
-        text: `${similarityPercent}%`,
-        cls: 'osba-similarity-badge',
-      });
-
-      // 유사도 바 시각화
       const barContainer = item.createDiv({ cls: 'osba-similarity-bar-container' });
       const bar = barContainer.createDiv({ cls: 'osba-similarity-bar' });
       bar.style.width = `${similarityPercent}%`;
 
-      // 스니펫
       if (result.snippet) {
-        item.createEl('p', {
-          text: result.snippet,
-          cls: 'osba-snippet',
-        });
+        item.createEl('p', { text: result.snippet, cls: 'osba-snippet' });
       }
     }
 
-    // 닫기 버튼
-    const buttonContainer = contentEl.createDiv({ cls: 'osba-button-container' });
-    new ButtonComponent(buttonContainer)
+    // 결과 내보내기
+    contentEl.createEl('hr', { cls: 'osba-divider' });
+    const exportSection = contentEl.createDiv();
+    exportSection.style.marginTop = '10px';
+    exportSection.createEl('h3', { text: '📥 결과 내보내기' });
+
+    const insertOptionsRow = exportSection.createDiv();
+    insertOptionsRow.style.cssText = 'display: flex; align-items: center; gap: 10px; margin-bottom: 10px;';
+    insertOptionsRow.createSpan({ text: '삽입 위치:' }).style.fontWeight = '500';
+
+    const dropdown = new DropdownComponent(insertOptionsRow);
+    dropdown.addOption('new-note', '📄 새 노트 생성');
+    dropdown.addOption('cursor', '📍 현재 커서 위치');
+    dropdown.addOption('end-of-note', '⬇️ 현재 노트 맨 끝');
+    dropdown.setValue(this.insertionMode);
+    dropdown.onChange((val: string) => {
+      this.insertionMode = val as InsertionMode;
+    });
+
+    const actionContainer = exportSection.createDiv({ cls: 'osba-action-buttons' });
+    actionContainer.style.cssText = 'display: flex; gap: 10px;';
+
+    new ButtonComponent(actionContainer)
+      .setButtonText('📥 결과 삽입하기')
+      .setCta()
+      .onClick(async () => {
+        const exportText = this.buildExportText();
+        this.close();
+        await this.handleInsertion(exportText);
+      });
+
+    new ButtonComponent(actionContainer)
       .setButtonText('닫기')
       .onClick(() => this.close());
+  }
+
+  private buildExportText(): string {
+    let text = `# 유사 노트: ${this.sourceFile.basename}\n\n`;
+    for (const result of this.results) {
+      const percent = (result.similarity * 100).toFixed(1);
+      text += `- **[[${result.title}]]** — 유사도 ${percent}%`;
+      if (result.snippet) text += ` — ${result.snippet}`;
+      text += '\n';
+    }
+    return text;
+  }
+
+  private async handleInsertion(output: string) {
+    if (this.insertionMode === 'new-note') {
+      let title = `유사 노트 - ${this.sourceFile.basename}`.replace(/[\\/:*?"<>|]/g, '');
+      const file = await this.app.vault.create(`${title}.md`, output);
+      this.app.workspace.openLinkText(file.path, '', true);
+    } else if (this.insertionMode === 'cursor') {
+      const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+      if (activeView && (activeView as any).editor) {
+        const cursor = (activeView as any).editor.getCursor();
+        (activeView as any).editor.replaceRange(`\n\n${output}\n\n`, cursor);
+      } else {
+        this.insertionMode = 'new-note';
+        await this.handleInsertion(output);
+      }
+    } else if (this.insertionMode === 'end-of-note') {
+      const activeFile = this.app.workspace.getActiveFile();
+      if (activeFile) {
+        const content = await this.app.vault.read(activeFile);
+        await this.app.vault.modify(activeFile, content + `\n\n---\n\n${output}\n`);
+      } else {
+        this.insertionMode = 'new-note';
+        await this.handleInsertion(output);
+      }
+    }
   }
 
   onClose() {
