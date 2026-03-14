@@ -154,6 +154,7 @@ export interface SavedPrompt {
   name: string;
   description?: string;
   prompt: string;
+  source?: 'custom' | 'multi-source';
 }
 
 export interface SourceItem {

@@ -267,71 +267,75 @@ export class AIAssistantModal extends Modal {
         if (!this.plugin.settings.savedPrompts || this.plugin.settings.savedPrompts.length === 0) {
             listContainer.createEl('p', { text: '저장된 커스텀 프롬프트가 없습니다.', cls: 'osba-modal-desc' });
         } else {
-            this.plugin.settings.savedPrompts.forEach((savedPrompt: SavedPrompt) => {
-                const item = listContainer.createDiv();
-                item.style.cssText = `
-                    display: flex; justify-content: space-between; align-items: center; 
-                    padding: 8px 12px; border: 1px solid var(--background-modifier-border); 
-                    border-radius: 6px; cursor: pointer;
-                `;
+            // 커스텀 탭에는 source가 없거나 'custom'인 프롬프트만 표시
+            const customPrompts = this.plugin.settings.savedPrompts.filter((p: SavedPrompt) => !p.source || p.source === 'custom');
+            if (customPrompts.length === 0) {
+                listContainer.createEl('p', { text: '저장된 커스텀 프롬프트가 없습니다.', cls: 'osba-modal-desc' });
+            } else {
+                customPrompts.forEach((savedPrompt: SavedPrompt) => {
+                    const item = listContainer.createDiv();
+                    item.style.cssText = `
+                        display: flex; justify-content: space-between; align-items: center; 
+                        padding: 8px 12px; border: 1px solid var(--background-modifier-border); 
+                        border-radius: 6px; cursor: pointer;
+                    `;
 
-                if (this.customPromptId === savedPrompt.id) {
-                    item.style.borderColor = 'var(--interactive-accent)';
-                    item.style.background = 'var(--background-secondary)';
-                }
-
-                const textDiv = item.createDiv();
-                textDiv.style.cssText = 'flex: 1; min-width: 0;';
-                textDiv.createDiv({ text: `💬 ${savedPrompt.name}` }).style.fontWeight = '500';
-                if (savedPrompt.description) {
-                    textDiv.createDiv({ text: savedPrompt.description }).style.cssText = 'font-size: 11px; color: var(--text-muted); margin-top: 2px;';
-                }
-
-                const btnGroup = item.createDiv();
-                btnGroup.style.cssText = 'display: flex; gap: 4px; flex-shrink: 0;';
-
-                const applyBtn = btnGroup.createEl('button', { text: '적용' });
-                applyBtn.style.fontSize = '12px';
-                applyBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    this.customPromptId = savedPrompt.id;
-                    this.promptText = savedPrompt.prompt;
-                    this.selectedTemplateId = 'custom';
-                    this.onOpen();
-                };
-
-                const editBtn = btnGroup.createEl('button', { text: '편집' });
-                editBtn.style.fontSize = '12px';
-                editBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    new PromptEditModal(this.app, async (name, description, promptBody) => {
-                        savedPrompt.name = name;
-                        savedPrompt.description = description;
-                        savedPrompt.prompt = promptBody;
-                        await this.plugin.saveSettings();
-                        new Notice('프롬프트가 수정되었습니다.');
-                        if (this.customPromptId === savedPrompt.id) {
-                            this.promptText = promptBody;
-                        }
-                        this.onOpen();
-                    }, savedPrompt).open();
-                };
-
-                const delBtn = btnGroup.createEl('button', { text: '삭제' });
-                delBtn.style.fontSize = '12px';
-                delBtn.onclick = async (e) => {
-                    e.stopPropagation();
-                    if (confirm(`'${savedPrompt.name}' 프롬프트를 삭제하시겠습니까?`)) {
-                        this.plugin.settings.savedPrompts = this.plugin.settings.savedPrompts.filter((p: SavedPrompt) => p.id !== savedPrompt.id);
-                        await this.plugin.saveSettings();
-                        if (this.customPromptId === savedPrompt.id) {
-                            this.customPromptId = null;
-                            this.promptText = '';
-                        }
-                        this.onOpen();
+                    if (this.customPromptId === savedPrompt.id) {
+                        item.style.borderColor = 'var(--interactive-accent)';
+                        item.style.background = 'var(--background-secondary)';
                     }
-                };
-            });
+
+                    // 전체 아이템 클릭 시 프롬프트 적용
+                    item.onclick = () => {
+                        this.customPromptId = savedPrompt.id;
+                        this.promptText = savedPrompt.prompt;
+                        this.selectedTemplateId = 'custom';
+                        this.onOpen();
+                    };
+
+                    const textDiv = item.createDiv();
+                    textDiv.style.cssText = 'flex: 1; min-width: 0;';
+                    textDiv.createDiv({ text: `💬 ${savedPrompt.name}` }).style.fontWeight = '500';
+                    if (savedPrompt.description) {
+                        textDiv.createDiv({ text: savedPrompt.description }).style.cssText = 'font-size: 11px; color: var(--text-muted); margin-top: 2px;';
+                    }
+
+                    const btnGroup = item.createDiv();
+                    btnGroup.style.cssText = 'display: flex; gap: 4px; flex-shrink: 0;';
+
+                    const editBtn = btnGroup.createEl('button', { text: '편집' });
+                    editBtn.style.fontSize = '12px';
+                    editBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        new PromptEditModal(this.app, async (name, description, promptBody) => {
+                            savedPrompt.name = name;
+                            savedPrompt.description = description;
+                            savedPrompt.prompt = promptBody;
+                            await this.plugin.saveSettings();
+                            new Notice('프롬프트가 수정되었습니다.');
+                            if (this.customPromptId === savedPrompt.id) {
+                                this.promptText = promptBody;
+                            }
+                            this.onOpen();
+                        }, savedPrompt).open();
+                    };
+
+                    const delBtn = btnGroup.createEl('button', { text: '삭제' });
+                    delBtn.style.fontSize = '12px';
+                    delBtn.onclick = async (e) => {
+                        e.stopPropagation();
+                        if (confirm(`'${savedPrompt.name}' 프롬프트를 삭제하시겠습니까?`)) {
+                            this.plugin.settings.savedPrompts = this.plugin.settings.savedPrompts.filter((p: SavedPrompt) => p.id !== savedPrompt.id);
+                            await this.plugin.saveSettings();
+                            if (this.customPromptId === savedPrompt.id) {
+                                this.customPromptId = null;
+                                this.promptText = '';
+                            }
+                            this.onOpen();
+                        }
+                    };
+                });
+            }
         }
     }
 
@@ -427,7 +431,8 @@ export class AIAssistantModal extends Modal {
                             id: `custom-${Date.now()}`,
                             name,
                             description: description || undefined,
-                            prompt: promptBody
+                            prompt: promptBody,
+                            source: 'custom'
                         };
                         if (!this.plugin.settings.savedPrompts) {
                             this.plugin.settings.savedPrompts = [];
@@ -566,10 +571,11 @@ export class AIAssistantModal extends Modal {
                     // 새 프롬프트 — PromptEditModal 사용
                     new PromptEditModal(this.app, async (name, description, promptBody) => {
                         const newPrompt: SavedPrompt = {
-                            id: `custom-${Date.now()}`,
+                            id: `custom-ms-${Date.now()}`,
                             name,
                             description: description || undefined,
-                            prompt: promptBody
+                            prompt: promptBody,
+                            source: 'multi-source'
                         };
                         if (!this.plugin.settings.savedPrompts) {
                             this.plugin.settings.savedPrompts = [];
