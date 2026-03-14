@@ -548,22 +548,27 @@ Generate the markdown content for the note:`;
       const content = await this.app.vault.read(file);
       const similar = await this.embeddingService.searchByQuery(content, 10);
 
-      // Save to frontmatter
-      const similarForFrontmatter = similar.map(n => ({
+      const similarForSection = similar.map(n => ({
         title: n.title,
         path: n.notePath,
         similarity: n.similarity
       }));
-      await this.frontmatterManager.updateSimilarNotes(file, similarForFrontmatter);
+
+      // Update frontmatter (version + date only)
+      await this.frontmatterManager.updateSimilarNotes(file, similarForSection);
+
+      // Get the new version from frontmatter
+      const osba = await this.frontmatterManager.getOSBAFrontmatter(file);
+      const version = osba?.similarNotesVersion || 1;
+
+      // Append/update results section at the bottom of note body
+      await this.frontmatterManager.addSimilarNotesSection(file, similarForSection, version);
 
       // Display results in a modal or notice
       if (similar.length === 0) {
         new Notice('No similar notes found. Try indexing your vault first.');
       } else {
-        const resultText = similar
-          .map((n, i) => `${i + 1}. ${n.title} (${(n.similarity * 100).toFixed(1)}%)`)
-          .join('\n');
-        new Notice(`Similar notes saved to frontmatter!\n\nTop matches:\n${resultText}`, 5000);
+        new Notice(`유사 노트 ${similar.length}개를 노트 하단에 저장했습니다. (v${version})`, 3000);
       }
 
     } catch (error) {

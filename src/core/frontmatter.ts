@@ -120,8 +120,8 @@ export class FrontmatterManager {
   }
 
   /**
-   * Update similar notes in frontmatter
-   * Saves the similar notes to YAML properties for persistent storage
+   * Update similar notes version/date in frontmatter (no longer stores full results)
+   * Version increments by 1 each time similar notes search is run
    */
   async updateSimilarNotes(file: TFile, similarNotes: Array<{ title: string; path: string; similarity: number }>): Promise<void> {
     const content = await this.app.vault.read(file);
@@ -130,13 +130,13 @@ export class FrontmatterManager {
     // Get or create OSBA namespace
     const osbaData: OSBAFrontmatter = frontmatter.osba || { version: 1 };
 
-    // Update similar notes with timestamp
-    osbaData.similarNotes = similarNotes.map(note => ({
-      path: note.path,
-      title: note.title,
-      similarity: Math.round(note.similarity * 100) / 100 // Round to 2 decimal places
-    }));
+    // Increment similar notes version
+    const prevVersion = osbaData.similarNotesVersion || 0;
+    osbaData.similarNotesVersion = prevVersion + 1;
     osbaData.similarNotesUpdated = new Date().toISOString();
+
+    // Remove old similarNotes array from frontmatter if it exists
+    delete osbaData.similarNotes;
 
     const updatedFrontmatter = {
       ...frontmatter,
@@ -145,6 +145,53 @@ export class FrontmatterManager {
 
     const newContent = this.buildContent(updatedFrontmatter, body);
     await this.app.vault.modify(file, newContent);
+  }
+
+  /**
+   * Add or update the Similar Notes section at the bottom of the note body
+   */
+  async addSimilarNotesSection(file: TFile, similarNotes: Array<{ title: string; path: string; similarity: number }>, version: number): Promise<void> {
+    const content = await this.app.vault.read(file);
+    const { frontmatter, body } = this.parseFrontmatter(content);
+
+    const sectionContent = this.generateSimilarNotesSection(similarNotes, version);
+
+    // Find and replace existing section, or append
+    const sectionRegex = /## 🔍 Similar Notes[\s\S]*?(?=\n## [^#]|\n---\n## |\Z)/;
+    let updatedBody: string;
+
+    if (sectionRegex.test(body)) {
+      updatedBody = body.replace(sectionRegex, sectionContent);
+    } else {
+      updatedBody = body.trimEnd() + '\n\n' + sectionContent;
+    }
+
+    const newContent = this.buildContent(frontmatter, updatedBody);
+    await this.app.vault.modify(file, newContent);
+  }
+
+  /**
+   * Generate the Similar Notes section markdown
+   */
+  private generateSimilarNotesSection(similarNotes: Array<{ title: string; path: string; similarity: number }>, version: number): string {
+    const lines: string[] = ['## 🔍 Similar Notes', ''];
+    const now = new Date().toLocaleString('ko-KR');
+    lines.push(`> 📅 검색 일시: ${now} | 버전: v${version}`);
+    lines.push('');
+
+    if (similarNotes.length === 0) {
+      lines.push('유사한 노트를 찾을 수 없습니다.');
+    } else {
+      lines.push('| # | 노트 | 유사도 |');
+      lines.push('|---|------|--------|');
+      similarNotes.forEach((note, i) => {
+        const percent = (note.similarity * 100).toFixed(1);
+        lines.push(`| ${i + 1} | [[${note.title}]] | ${percent}% |`);
+      });
+    }
+
+    lines.push('');
+    return lines.join('\n');
   }
 
   /**

@@ -265,6 +265,7 @@ export interface OSBAFrontmatter {
     title: string;
     similarity: number;
   }[];
+  similarNotesVersion?: number;
   similarNotesUpdated?: string;  // ISO8601
 }
 
