@@ -1,7 +1,7 @@
 {
   "name": "note-agent",
-  "version": "0.4.0",
-  "description": "AI-powered Note automation for Obsidian",
+  "version": "0.4.1",
+  "description": "AI-powered note creation, embedding generation, connection analysis, and knowledge gap detection",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
