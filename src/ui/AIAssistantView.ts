@@ -956,14 +956,6 @@ export class AIAssistantView extends ItemView {
         actionGroup.style.width = '100%';
 
         if (this.viewMode === 'prompt') {
-            const cancelBtn = new ButtonComponent(actionGroup)
-                .setButtonText('🔙 취소 (창 닫기)')
-                .onClick(() => {
-                    this.viewMode = 'prompt';
-                    this.onOpen();
-                });
-            cancelBtn.buttonEl.style.width = '100%';
-
             const aiBtn = new ButtonComponent(actionGroup)
                 .setButtonText('🚀 AI 실행')
                 .setCta()
@@ -1033,8 +1025,15 @@ export class AIAssistantView extends ItemView {
         } else {
             // 기존 단일 파일/선택영역 모드
             // 1. 현재 에디터 내용 혹은 노트 내용 가져오기
-            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
             const activeFile = this.app.workspace.getActiveFile();
+            
+            // 사이드바 포커스 시 getActiveViewOfType가 null일 수 있으므로 우회 탐색
+            let activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (!activeView && activeFile) {
+                const leaves = this.app.workspace.getLeavesOfType("markdown");
+                const leaf = leaves.find(l => (l.view as MarkdownView).file?.path === activeFile.path);
+                if (leaf) activeView = leaf.view as MarkdownView;
+            }
 
             if (activeView && (activeView as any).editor) {
                 targetContent = (activeView as any).editor.getSelection();
@@ -1103,7 +1102,12 @@ export class AIAssistantView extends ItemView {
             this.app.workspace.openLinkText(fileToOpen.path, '', true);
 
         } else if (mode === 'cursor') {
-            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+            let activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (!activeView && activeFile) {
+                const leaves = this.app.workspace.getLeavesOfType("markdown");
+                const leaf = leaves.find(l => (l.view as MarkdownView).file?.path === activeFile.path);
+                if (leaf) activeView = leaf.view as MarkdownView;
+            }
 
             if (activeView && (activeView as any).editor) {
                 const cursor = (activeView as any).editor.getCursor();
