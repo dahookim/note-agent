@@ -12,6 +12,7 @@ export class AIAssistantView extends ItemView {
     // UI State
     private activeTab: 'note-agent' | 'easy-gate' | 'stargate' | 'custom' | 'multi-source' = 'note-agent';
     private selectedTemplateId: string | null = null;
+    // Removed activeFileAtOpen since ItemView remains open and should dynamically fetch the active file
     private customPromptId: string | null = null;
     private promptText: string = '';
     private insertionMode: InsertionMode;
@@ -26,7 +27,7 @@ export class AIAssistantView extends ItemView {
     // Preview / Result State
     private viewMode: 'prompt' | 'result' = 'prompt';
     private aiOutput: string = '';
-    private activeFileAtOpen: TFile | null = null;
+
     private usedPromptText: string = '';
     private includePromptInInsert: boolean = false;
 
@@ -39,13 +40,13 @@ export class AIAssistantView extends ItemView {
         this.plugin = plugin;
         this.insertionMode = this.plugin.settings.defaultInsertionMode || 'new-note';
         this.outputLanguage = this.plugin.settings.defaultOutputLanguage || 'Auto';
-        this.activeFileAtOpen = this.app.workspace.getActiveFile();
+        const initialActiveFile = this.app.workspace.getActiveFile();
 
         this.updateNoteAgentPrompt();
 
         // Auto-add current file to multi-source if available
-        if (this.activeFileAtOpen) {
-            this.addActiveNoteToSources(this.activeFileAtOpen);
+        if (initialActiveFile) {
+            this.addActiveNoteToSources(initialActiveFile);
         }
     }
 
@@ -1004,7 +1005,8 @@ export class AIAssistantView extends ItemView {
                     if (this.includePromptInInsert && this.usedPromptText) {
                         output = `> **📋 요청 프롬프트**\n> ${this.usedPromptText.replace(/\n/g, '\n> ')}\n\n---\n\n${output}`;
                     }
-                    await this.handleInsertion(output, this.activeFileAtOpen);
+                    const dynamicActiveFile = this.app.workspace.getActiveFile();
+                    await this.handleInsertion(output, dynamicActiveFile);
                 });
             insertBtn.buttonEl.style.width = '100%';
         }
@@ -1124,7 +1126,7 @@ export class AIAssistantView extends ItemView {
         const feature = this.noteAgentFeature;
 
         if (feature === 'analyze') {
-            const file = this.activeFileAtOpen;
+            const file = this.app.workspace.getActiveFile();
             if (!file || file.extension !== 'md') {
                 new Notice('활성화된 마크다운 노트가 없습니다.');
                 this.isProcessing = false;
@@ -1195,7 +1197,7 @@ export class AIAssistantView extends ItemView {
                 }
             });
         } else if (feature === 'similar') {
-            const file = this.activeFileAtOpen;
+            const file = this.app.workspace.getActiveFile();
             if (!file || file.extension !== 'md') {
                 new Notice('활성화된 마크다운 노트가 없습니다.');
                 this.isProcessing = false;
