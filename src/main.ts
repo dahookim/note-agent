@@ -1,5 +1,5 @@
-import { App, Plugin, PluginManifest, Notice, TFile, Events } from 'obsidian';
-import { OSBASettings, DEFAULT_SETTINGS, Job, JobStatus, AnalysisResult } from './types';
+import { App, Plugin, PluginManifest, Notice, TFile, Events, WorkspaceLeaf } from 'obsidian';
+import { OSBASettings, DEFAULT_SETTINGS, Job, JobStatus, AnalysisResult, AI_ASSISTANT_VIEW_TYPE } from './types';
 import { OSBASettingTab } from './ui/settings';
 import { Database } from './db/database';
 import { AIProviderManager } from './api/provider';
@@ -7,7 +7,7 @@ import { EmbeddingService } from './core/embeddings';
 import { ConnectionAnalyzer } from './core/analyzer';
 import { FrontmatterManager } from './core/frontmatter';
 import { QuickDraftModal } from './ui/modals';
-import { AIAssistantModal } from './ui/AIAssistantModal';
+import { AIAssistantView } from './ui/AIAssistantView';
 import { ProgressModal } from './ui/progress-modal';
 import {
   JobQueueView,
@@ -74,7 +74,7 @@ export default class OSBAPlugin extends Plugin {
 
     // Add ribbon icon
     this.addRibbonIcon('brain-circuit', 'OSBA: Quick Actions', () => {
-      new AIAssistantModal(this.app, this).open();
+      this.activateView(AI_ASSISTANT_VIEW_TYPE);
     });
 
     // Delay plugin ready flag to prevent auto-analysis on startup
@@ -183,6 +183,12 @@ export default class OSBAPlugin extends Plugin {
   // ============================================
 
   private registerViews(): void {
+    // AI Assistant View
+    this.registerView(
+      AI_ASSISTANT_VIEW_TYPE,
+      (leaf) => new AIAssistantView(leaf, this)
+    );
+
     // Job Queue View
     this.registerView(
       JOB_QUEUE_VIEW_TYPE,
@@ -218,7 +224,7 @@ export default class OSBAPlugin extends Plugin {
       id: 'open-main-menu',
       name: 'Open Main Menu - Quick Actions',
       callback: () => {
-        new AIAssistantModal(this.app, this).open();
+        this.activateView(AI_ASSISTANT_VIEW_TYPE);
       },
     });
 
@@ -755,10 +761,18 @@ Generate the markdown content for the note:`;
     let leaf = workspace.getLeavesOfType(viewType)[0];
 
     if (!leaf) {
-      const rightLeaf = workspace.getRightLeaf(false);
-      if (rightLeaf) {
-        await rightLeaf.setViewState({ type: viewType, active: true });
-        leaf = rightLeaf;
+      if (viewType === AI_ASSISTANT_VIEW_TYPE) {
+        const leftLeaf = workspace.getLeftLeaf(false);
+        if (leftLeaf) {
+          await leftLeaf.setViewState({ type: viewType, active: true });
+          leaf = leftLeaf;
+        }
+      } else {
+        const rightLeaf = workspace.getRightLeaf(false);
+        if (rightLeaf) {
+          await rightLeaf.setViewState({ type: viewType, active: true });
+          leaf = rightLeaf;
+        }
       }
     }
 

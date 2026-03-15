@@ -419,3 +419,8 @@ export class RateLimitError extends APIError {
     this.name = 'RateLimitError';
   }
 }
+
+export const COST_DASHBOARD_VIEW_TYPE = 'osba-cost-dashboard-view';
+export const SIMILAR_NOTES_VIEW_TYPE = 'osba-similar-notes-view';
+export const KNOWLEDGE_GRAPH_VIEW_TYPE = 'osba-knowledge-graph-view';
+export const AI_ASSISTANT_VIEW_TYPE = 'osba-ai-assistant-view';
