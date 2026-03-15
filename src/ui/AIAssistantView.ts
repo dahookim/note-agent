@@ -217,11 +217,11 @@ export class AIAssistantView extends ItemView {
             };
         };
 
+        createTab('note-agent', 'Note Agent');
         createTab('easy-gate', 'Easy Gate');
         createTab('stargate', 'Stargate');
         createTab('custom', 'Custom');
         createTab('multi-source', 'Multi-Source');
-        createTab('note-agent', 'Note Agent');
     }
 
     private renderTabContent() {
