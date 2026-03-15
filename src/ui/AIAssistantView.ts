@@ -160,15 +160,15 @@ export class AIAssistantView extends ItemView {
         embedSetting.settingEl.style.padding = '0';
 
 
-        // 메인 레이아웃 (왼쪽 탭/옵션, 오른쪽 미리보기)
+        // 메인 레이아웃 (왼쪽 탭/옵션, 오른쪽 미리보기) -> 세로 레이아웃(위: 탭/옵션, 아래: 미리보기)
         const mainContainer = contentEl.createDiv({ cls: 'assistant-main-container' });
-        mainContainer.style.cssText = 'display: flex; gap: 20px; align-items: flex-start;';
+        mainContainer.style.cssText = 'display: flex; flex-direction: column; gap: 20px; width: 100%;';
 
         const leftPanel = mainContainer.createDiv({ cls: 'assistant-left-panel' });
-        leftPanel.style.cssText = 'flex: 1; min-width: 250px;';
+        leftPanel.style.cssText = 'width: 100%;';
 
         const rightPanel = mainContainer.createDiv({ cls: 'assistant-right-panel' });
-        rightPanel.style.cssText = 'flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 350px;';
+        rightPanel.style.cssText = 'width: 100%; display: flex; flex-direction: column; gap: 10px;';
 
         this.renderTabs(leftPanel);
 
@@ -184,7 +184,7 @@ export class AIAssistantView extends ItemView {
 
     private renderTabs(container: HTMLElement) {
         const tabContainer = container.createDiv({ cls: 'osba-tabs' });
-        tabContainer.style.cssText = 'display: flex; border-bottom: 1px solid var(--background-modifier-border); margin-bottom: 15px;';
+        tabContainer.style.cssText = 'display: flex; border-bottom: 1px solid var(--background-modifier-border); margin-bottom: 15px; overflow-x: auto; white-space: nowrap; padding-bottom: 4px;';
 
         const createTab = (id: typeof this.activeTab, label: string) => {
             const tabEl = tabContainer.createDiv({ cls: 'osba-tab' });
@@ -378,7 +378,7 @@ export class AIAssistantView extends ItemView {
 
     private renderTemplateGrid(templates: typeof ANALYSIS_TEMPLATES) {
         const grid = this.contentContainer.createDiv({ cls: 'template-grid' });
-        grid.style.cssText = 'display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;';
+        grid.style.cssText = 'display: grid; grid-template-columns: 1fr; gap: 10px;';
 
         templates.forEach(template => {
             const card = grid.createDiv({ cls: 'template-card' });
@@ -904,12 +904,13 @@ export class AIAssistantView extends ItemView {
 
     private renderFooter(container: HTMLElement) {
         const footerInfo = container.createDiv();
-        footerInfo.style.cssText = 'margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--background-modifier-border); display: flex; justify-content: space-between; align-items: center;';
+        footerInfo.style.cssText = 'margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--background-modifier-border); display: flex; flex-direction: column; gap: 12px; width: 100%;';
 
         const languageGroup = footerInfo.createDiv();
         languageGroup.style.display = 'flex';
-        languageGroup.style.alignItems = 'center';
-        languageGroup.style.gap = '10px';
+        languageGroup.style.flexDirection = 'column';
+        languageGroup.style.gap = '5px';
+        languageGroup.style.width = '100%';
         languageGroup.createSpan({ text: '출력 언어:', cls: 'setting-item-name' });
 
         const langDropdown = new DropdownComponent(languageGroup);
@@ -925,10 +926,13 @@ export class AIAssistantView extends ItemView {
             await this.plugin.saveSettings();
         });
 
+        langDropdown.selectEl.style.width = '100%';
+
         const insertOptionsGroup = footerInfo.createDiv();
         insertOptionsGroup.style.display = 'flex';
-        insertOptionsGroup.style.alignItems = 'center';
-        insertOptionsGroup.style.gap = '10px';
+        insertOptionsGroup.style.flexDirection = 'column';
+        insertOptionsGroup.style.gap = '5px';
+        insertOptionsGroup.style.width = '100%';
 
         insertOptionsGroup.createSpan({ text: '출력 위치:', cls: 'setting-item-name' });
 
@@ -942,22 +946,24 @@ export class AIAssistantView extends ItemView {
             this.plugin.settings.defaultInsertionMode = this.insertionMode;
             await this.plugin.saveSettings();
         });
+        dropdown.selectEl.style.width = '100%';
 
         const actionGroup = footerInfo.createDiv();
         actionGroup.style.display = 'flex';
+        actionGroup.style.flexDirection = 'column';
         actionGroup.style.gap = '10px';
+        actionGroup.style.width = '100%';
 
         if (this.viewMode === 'prompt') {
-            new ButtonComponent(actionGroup)
+            const cancelBtn = new ButtonComponent(actionGroup)
                 .setButtonText('🔙 취소 (창 닫기)')
                 .onClick(() => {
-                    // ItemView는 보통 닫기 버튼 대신 뷰 자체를 유지하므로, 취소 기능이 필요없거나 
-                    // 프롬프트 모드로 돌아가게 할 수 있습니다. 
                     this.viewMode = 'prompt';
                     this.onOpen();
                 });
+            cancelBtn.buttonEl.style.width = '100%';
 
-            new ButtonComponent(actionGroup)
+            const aiBtn = new ButtonComponent(actionGroup)
                 .setButtonText('🚀 AI 실행')
                 .setCta()
                 .onClick(async () => {
@@ -970,13 +976,15 @@ export class AIAssistantView extends ItemView {
 
                     await this.executeAI();
                 });
+            aiBtn.buttonEl.style.width = '100%';
         } else {
-            new ButtonComponent(actionGroup)
+            const backBtn = new ButtonComponent(actionGroup)
                 .setButtonText('🔙 이전으로')
                 .onClick(() => {
                     this.viewMode = 'prompt';
                     this.onOpen();
                 });
+            backBtn.buttonEl.style.width = '100%';
 
             // 프롬프트 포함 체크박스
             if (this.usedPromptText) {
@@ -988,7 +996,7 @@ export class AIAssistantView extends ItemView {
                 checkboxRow.createEl('span', { text: '프롬프트 포함' }).style.cssText = 'font-size: 12px;';
             }
 
-            new ButtonComponent(actionGroup)
+            const insertBtn = new ButtonComponent(actionGroup)
                 .setButtonText('📥 결과 삽입하기')
                 .setCta()
                 .onClick(async () => {
@@ -998,6 +1006,7 @@ export class AIAssistantView extends ItemView {
                     }
                     await this.handleInsertion(output, this.activeFileAtOpen);
                 });
+            insertBtn.buttonEl.style.width = '100%';
         }
     }
 
