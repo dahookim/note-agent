@@ -1086,8 +1086,10 @@ export class AIAssistantView extends ItemView {
         });
     }
 
-    private async handleInsertion(output: string, activeFile: TFile | null) {
-        if (this.insertionMode === 'new-note') {
+    private async handleInsertion(output: string, activeFile: TFile | null, forceNewNote: boolean = false) {
+        const mode = forceNewNote ? 'new-note' : this.insertionMode;
+
+        if (mode === 'new-note') {
             const firstLine = output.split('\n')[0];
             let title = firstLine.replace(/^#*\s*/, '').trim();
             title = title.replace(/[\\/:*?"<>|]/g, ''); // Sanitize
@@ -1100,7 +1102,7 @@ export class AIAssistantView extends ItemView {
             let fileToOpen = await this.app.vault.create(fileName, output);
             this.app.workspace.openLinkText(fileToOpen.path, '', true);
 
-        } else if (this.insertionMode === 'cursor') {
+        } else if (mode === 'cursor') {
             const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 
             if (activeView && (activeView as any).editor) {
@@ -1108,16 +1110,16 @@ export class AIAssistantView extends ItemView {
                 (activeView as any).editor.replaceRange(`\n\n${output}\n\n`, cursor);
             } else {
                 new Notice('현재 활성화된 에디터가 없습니다. 새 노트로 생성합니다.');
-                await this.handleInsertion(output, null); // Fallback
+                await this.handleInsertion(output, null, true); // Fallback to new note
             }
 
-        } else if (this.insertionMode === 'end-of-note') {
+        } else if (mode === 'end-of-note') {
             if (activeFile) {
                 const content = await this.app.vault.read(activeFile);
                 await this.app.vault.modify(activeFile, content + `\n\n---\n\n## AI Analysis\n\n${output}\n`);
             } else {
                 new Notice('현재 활성화된 노트가 없습니다. 새 노트로 생성합니다.');
-                await this.handleInsertion(output, null); // Fallback
+                await this.handleInsertion(output, null, true); // Fallback to new note
             }
         }
     }
